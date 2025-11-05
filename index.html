@@ -1,0 +1,257 @@
+<!doctype html><html lang="it"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sicily BVS – Multe</title>
+<link rel="icon" href="/icon-192.png" sizes="192x192">
+<style>
+:root{--gold:#D4A000;--blue:#1C75BC;--ink:#0b0b0f}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--ink);background:linear-gradient(180deg,#e9f2ff,#fef9e6)}
+.wrap{min-height:100%;display:flex;justify-content:center;padding:16px}
+.container{width:min(980px,100%)}
+.head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{width:52px;height:52px;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.input{padding:10px 12px;border:1px solid #d4d4dd;border-radius:10px;background:#fff;min-height:38px}
+.btn{padding:9px 12px;border-radius:10px;border:0;background:var(--blue);color:#fff;cursor:pointer}
+.btn.ghost{background:transparent;color:#dc2626;border:1px solid #f0caca}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:880px){.grid{grid-template-columns:1fr 1fr}}
+.card{background:#fff;border-top:4px solid var(--gold);border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.06);padding:12px}
+.title{font-size:1.05rem;font-weight:700;margin:0 0 8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.table{width:100%;border-collapse:collapse;font-size:.95rem}
+.table th,.table td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+.right{text-align:right}.muted{opacity:.75}
+.badge{background:var(--blue);color:#fff;border-radius:999px;padding:2px 8px;font-size:.75rem;margin-left:6px}
+.chip{background:#fff8e1;border:1px solid #ffe2a3;border-radius:999px;padding:4px 8px;font-weight:600}
+</style>
+</head><body>
+<div class="wrap"><div class="container">
+  <div class="head">
+    <div class="brand">
+      <img src="/logo.png" class="logo" alt="Sicily BVS">
+      <div><div style="font-weight:800">Multe Pallavolo – Sicily BVS</div><div class="muted">Accesso riservato all’amministratore con PIN.</div></div>
+    </div>
+    <div class="row" id="actions"></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div></div>
+
+<script>
+(function(){
+  const $= (s,e=document)=>e.querySelector(s);
+  const fmt=(n)=>new Intl.NumberFormat(undefined,{style:'currency',currency:'EUR'}).format(n||0);
+  const todayISO=()=>new Date().toISOString().slice(0,10);
+  const fmtIT=(iso)=>{try{const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`}catch{return iso}};
+  const uid=()=>`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+
+  const LS='sicilybvs-data-v1';
+  const save=(s)=>{const j=JSON.stringify(s);try{localStorage.setItem(LS,j)}catch{}try{sessionStorage.setItem(LS,j)}catch{}};
+  const load=()=>{try{const r=localStorage.getItem(LS)||sessionStorage.getItem(LS);return r?JSON.parse(r):null}catch{return null}};
+
+  const DEF_PLAYERS=["Renato Russo","Gianluigi Gogliandolo","Roberto Cazzaniga","Marco Alaimo","Lorenza Alcantarini","Pierluigi Ardiri","Niccolò Baldaccini","Joaquin Mago","Davide Pietroni","Simone Pisani","Carmelo Mazza","Stefano Remo","Fabio Remo","Gabriele Rizzo","Giorgio Sulfaro"];
+  const DEF_PIN="2659";
+
+  let state=load()||{};
+  state.players=state.players||DEF_PLAYERS.map(n=>({id:uid(),name:n}));
+  state.fines=state.fines||[];
+  const y=new Date().getFullYear();
+  state.seasonName=state.seasonName||`Stagione ${y}/${String(y+1).slice(2)}`;
+  state.adminPin=state.adminPin||DEF_PIN;
+  state.categories=state.categories||[
+    {id:uid(),name:"Ritardo",amount:2},
+    {id:uid(),name:"Assenza",amount:5},
+    {id:uid(),name:"Maglia dimenticata",amount:1},
+    {id:uid(),name:"Paste",amount:null}
+  ];
+  state.sbUrl=state.sbUrl||""; state.sbAnon=state.sbAnon||""; state.teamSlug=state.teamSlug||"sicily-bvs";
+  state.cloudTs=state.cloudTs||0;
+  let unlocked=false;
+  save(state);
+
+  const supa={
+    get active(){return !!(state.sbUrl&&state.sbAnon&&state.teamSlug)},
+    base(){return state.sbUrl.replace(/\/+$/,'')},
+    table(){return `${supa.base()}/rest/v1/vb_fines`},
+    headers(extra={}){return {'apikey':state.sbAnon,'Authorization':'Bearer '+state.sbAnon,'Content-Type':'application/json','Prefer':'return=representation',...extra}},
+    async pull(){
+      if(!supa.active) return;
+      try{
+        const u=`${supa.table()}?team_slug=eq.${encodeURIComponent(state.teamSlug)}&select=payload,updated_at`;
+        const r=await fetch(u,{headers:supa.headers()});
+        if(!r.ok) return;
+        const arr=await r.json();
+        if(!arr||!arr[0]) return;
+        const ts=new Date(arr[0].updated_at||0).getTime();
+        if(ts>(state.cloudTs||0)){
+          const p=arr[0].payload||{};
+          state.players=p.players||[]; state.fines=p.fines||[];
+          state.seasonName=p.seasonName||state.seasonName;
+          state.categories=p.categories||state.categories;
+          state.cloudTs=ts; save(state); render(); flash('Sincronizzato dal cloud');
+        }
+      }catch{}
+    },
+    async upsert(){
+      if(!supa.active) return;
+      try{
+        const body=[{team_slug:state.teamSlug,payload:{players:state.players,fines:state.fines,seasonName:state.seasonName,categories:state.categories},updated_at:new Date().toISOString()}];
+        const r=await fetch(supa.table(),{method:'POST',headers:supa.headers({'Prefer':'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(body)});
+        if(!r.ok) return;
+        const arr=await r.json(); const ts=new Date(arr[0]?.updated_at||0).getTime();
+        if(ts){state.cloudTs=ts; save(state)}; flash('Salvato nel cloud');
+      }catch{}
+    }
+  };
+  let pushTimer=null; function schedulePush(){if(!supa.active)return; clearTimeout(pushTimer); pushTimer=setTimeout(()=>supa.upsert(),1200);}
+
+  function totalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t}
+  function pasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{if(f.isPaste)t[f.playerId]=(t[f.playerId]||0)+1}); return t}
+  function teamTotal(){return state.fines.reduce((s,f)=>s+Number(f.amount||0),0)}
+  function teamPaste(){return state.fines.reduce((s,f)=>s+(f.isPaste?1:0),0)}
+
+  function el(tag,attrs={},children=[]){const e=document.createElement(tag); for(const k in attrs){ if(k==='className')e.className=attrs[k]; else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(),attrs[k]); else e.setAttribute(k,attrs[k]); } (Array.isArray(children)?children:[children]).forEach(c=>{ if(c==null)return; if(typeof c==='string') e.appendChild(document.createTextNode(c)); else e.appendChild(c); }); return e}
+  function flash(msg){if(!msg)return; const b=el('div',{className:'chip',style:'position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:9999'},msg); document.body.appendChild(b); setTimeout(()=>b.remove(),1500)}
+
+  function renderActions(){
+    const box=$('#actions'); box.innerHTML='';
+    if(!unlocked){ box.appendChild(el('button',{className:'btn',onClick:()=>{const p=prompt('PIN admin'); if(p===state.adminPin){unlocked=true; render()} else alert('PIN errato')}},'PIN')); return; }
+    const inp=el('input',{className:'input',value:state.seasonName,title:'Stagione'}); inp.addEventListener('input',()=>{state.seasonName=inp.value; save(state); schedulePush()}); box.appendChild(inp);
+    box.appendChild(el('button',{className:'btn',onClick:exportCSV},'CSV'));
+    box.appendChild(el('button',{className:'btn',onClick:exportJSON},'Backup'));
+    const lab=el('label',{className:'btn'},['Import',el('input',{type:'file',accept:'.json,application/json',style:'display:none',onChange:(e)=>{const f=e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=ev=>{try{const p=JSON.parse(ev.target.result); state.players=p.players||[]; state.fines=p.fines||[]; state.seasonName=p.seasonName||state.seasonName; state.categories=p.categories||state.categories; save(state); render(); flash('Dati importati'); schedulePush()}catch{alert('File non valido')}}; rd.readAsText(f)}})]);
+    box.appendChild(lab);
+    box.appendChild(el('button',{className:'btn',onClick:()=>{unlocked=false; render()}},'Esci'));
+  }
+
+  function render(){
+    renderActions();
+    const grid=$('#grid'); grid.innerHTML='';
+    const totals=totalsByPlayer(), pastes=pasteByPlayer();
+
+    if(unlocked){
+      const card=el('div',{className:'card'});
+      card.appendChild(el('div',{className:'title'},'Giocatori (solo admin)'));
+      const row=el('div',{className:'row',style:'margin-bottom:8px;'});
+      const addInp=el('input',{className:'input',placeholder:'Aggiungi giocatore'});
+      const addBtn=el('button',{className:'btn',onClick:()=>{const t=(addInp.value||'').trim(); if(!t)return; if(state.players.some(p=>p.name.toLowerCase()===t.toLowerCase()))return alert('Giocatore già presente'); state.players.push({id:uid(),name:t}); addInp.value=''; save(state); render(); schedulePush()}},'Aggiungi');
+      row.appendChild(addInp); row.appendChild(addBtn); card.appendChild(row);
+      if(state.players.length===0) card.appendChild(el('div',{className:'muted'},'Nessun giocatore.'));
+      else{
+        const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale'),el('th',{},'')])));
+        const tbody=el('tbody');
+        state.players.forEach(p=>{
+          const tr=el('tr',{}), nameTd=el('td',{}), nameInp=el('input',{className:'input',value:p.name});
+          nameInp.addEventListener('blur',()=>{p.name=nameInp.value.trim(); save(state); render(); schedulePush()}); nameTd.appendChild(nameInp);
+          const totTd=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); totTd.appendChild(wrap);
+          const delTd=el('td',{className:'right'}); delTd.appendChild(el('button',{className:'btn ghost',onClick:()=>{if(!confirm('Eliminare il giocatore?'))return; state.players=state.players.filter(x=>x.id!==p.id); save(state); render(); schedulePush()}},'✕'));
+          tr.appendChild(nameTd); tr.appendChild(totTd); tr.appendChild(delTd); tbody.appendChild(tr);
+        });
+        const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
+        const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
+        tr.appendChild(tt); tr.appendChild(el('td',{},'')); tbody.appendChild(tr);
+        table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
+      }
+      grid.appendChild(card);
+    } else {
+      const card=el('div',{className:'card'});
+      card.appendChild(el('div',{className:'title'},'Riepilogo'));
+      if(state.players.length===0) card.appendChild(el('div',{className:'muted'},'Nessun giocatore.'));
+      else{
+        const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale')])));
+        const tbody=el('tbody');
+        state.players.forEach(p=>{const tr=el('tr',{}); tr.appendChild(el('td',{},p.name));
+          const td=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); td.appendChild(wrap);
+          tr.appendChild(td); tbody.appendChild(tr)});
+        const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
+        const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
+        tr.appendChild(tt); tbody.appendChild(tr); table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
+      }
+      grid.appendChild(card);
+    }
+
+    if(unlocked){
+      const card=el('div',{className:'card'}); card.appendChild(el('div',{className:'title'},'Nuova multa (solo admin)'));
+      const row=el('div',{className:'row'});
+      const catSel=el('select',{className:'input'}); catSel.appendChild(el('option',{value:''},'Categoria…')); state.categories.forEach(c=>catSel.appendChild(el('option',{value:c.id},`${c.name} ${c.amount!=null?`(${c.amount}€)`:'(—)'}`)));
+      const playerSel=el('select',{className:'input'}); playerSel.appendChild(el('option',{value:''},'Giocatore…')); state.players.forEach(p=>playerSel.appendChild(el('option',{value:p.id},p.name)));
+      const amtInp=el('input',{className:'input',type:'number',step:'0.01',placeholder:'€'});
+      const dateInp=el('input',{className:'input',type:'date',value:todayISO()});
+      const reasonInp=el('input',{className:'input',placeholder:'Motivo'});
+      const addBtn=el('button',{className:'btn'},'Aggiungi');
+      const resetBtn=el('button',{className:'btn'},'Azzera stagione');
+
+      function syncAmtDisabled(){const c=state.categories.find(x=>x.id===catSel.value); amtInp.disabled=!!(c&&(c.name==='Paste'||c.amount==null)); if(!amtInp.disabled&&c&&c.amount!=null)amtInp.value=c.amount; if(amtInp.disabled)amtInp.value=''}
+      catSel.addEventListener('change',syncAmtDisabled); syncAmtDisabled();
+
+      addBtn.addEventListener('click',()=>{
+        const pid=playerSel.value; if(!pid) return alert('Seleziona un giocatore');
+        const cat=state.categories.find(x=>x.id===catSel.value);
+        const isPaste=!!(cat&&(cat.name==='Paste'||cat.amount==null));
+        const val=isPaste?0:Number(amtInp.value);
+        if(!isPaste&&(isNaN(val)||val<=0)) return alert('Importo non valido');
+        state.fines.unshift({id:uid(),playerId:pid,amount:val,reason:(reasonInp.value||'').trim(),date:dateInp.value||todayISO(),categoryId:cat?cat.id:null,isPaste});
+        save(state); render(); schedulePush();
+        reasonInp.value=''; amtInp.value=''; dateInp.value=todayISO(); playerSel.value=''; catSel.value=''; syncAmtDisabled();
+      });
+      resetBtn.addEventListener('click',()=>{if(confirm('Azzerare tutte le multe?')){state.fines=[]; save(state); render(); schedulePush()}});
+
+      row.appendChild(catSel); row.appendChild(playerSel); row.appendChild(amtInp); row.appendChild(dateInp); row.appendChild(reasonInp); row.appendChild(addBtn); row.appendChild(resetBtn);
+      card.appendChild(row); grid.appendChild(card);
+    }
+
+    const card=el('div',{className:'card',style:'grid-column:1 / -1'}); card.appendChild(el('div',{className:'title'},'Dettaglio multe'));
+    if(state.fines.length===0) card.appendChild(el('div',{className:'muted'},'Ancora nessuna multa.'));
+    else{
+      const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Data'),el('th',{},'Giocatore'),el('th',{},'Motivo'),el('th',{},'Categoria'),el('th',{className:'right'},'€'),unlocked?el('th',{},''):null].filter(Boolean))));
+      const tbody=el('tbody');
+      state.fines.forEach(f=>{
+        const tr=el('tr',{});
+        const tdDate=el('td',{}); if(unlocked){const di=el('input',{className:'input',type:'date',value:f.date}); di.addEventListener('change',()=>{f.date=di.value; save(state); schedulePush()}); tdDate.appendChild(di)} else tdDate.textContent=fmtIT(f.date);
+        const tdPl=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'Sconosciuto')); state.players.forEach(p=>sel.appendChild(el('option',{value:p.id,selected:p.id===f.playerId},p.name))); sel.addEventListener('change',()=>{f.playerId=sel.value; save(state); schedulePush()}); tdPl.appendChild(sel)} else {const pl=state.players.find(x=>x.id===f.playerId); tdPl.textContent=pl?pl.name:'Sconosciuto'}
+        const tdRe=el('td',{}); if(unlocked){const ri=el('input',{className:'input',value:f.reason||''}); ri.addEventListener('input',()=>{f.reason=ri.value; save(state)}); ri.addEventListener('blur',()=>{schedulePush()}); tdRe.appendChild(ri)} else tdRe.textContent=f.reason||'';
+        const tdCa=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'(nessuna)')); state.categories.forEach(c=>sel.appendChild(el('option',{value:c.id,selected:(f.categoryId||'')===c.id},c.name))); sel.addEventListener('change',()=>{f.categoryId=sel.value||null; const c=state.categories.find(x=>x.id===f.categoryId); f.isPaste=!!(c&&(c.name==='Paste'||c.amount==null)); if(f.isPaste)f.amount=0; save(state); render(); schedulePush()}); tdCa.appendChild(sel)} else {const c=state.categories.find(x=>x.id===f.categoryId); tdCa.textContent=c?c.name:(f.isPaste?'Paste':'')}
+        const tdAm=el('td',{className:'right'}); if(unlocked){const ai=el('input',{className:'input',type:'number',step:'0.01',value:f.amount}); if(f.isPaste) ai.disabled=true; ai.addEventListener('input',()=>{f.amount=Number(ai.value||0)}); ai.addEventListener('blur',()=>{save(state); schedulePush()}); tdAm.appendChild(ai)} else tdAm.textContent=fmt(f.amount);
+        tr.appendChild(tdDate); tr.appendChild(tdPl); tr.appendChild(tdRe); tr.appendChild(tdCa); tr.appendChild(tdAm);
+        if(unlocked){const tdDel=el('td',{className:'right'}); tdDel.appendChild(el('button',{className:'btn ghost',onClick:()=>{state.fines=state.fines.filter(x=>x.id!==f.id); save(state); render(); schedulePush()}},'Elimina')); tr.appendChild(tdDel)}
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
+    }
+    grid.appendChild(card);
+
+    if(unlocked){
+      const card=el('div',{className:'card',style:'grid-column:1 / -1'});
+      card.appendChild(el('div',{className:'title'},'Impostazioni (admin)'));
+      const row=el('div',{className:'row'});
+      const pin=el('input',{className:'input',placeholder:'Nuovo PIN (Enter)'}); pin.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&pin.value.trim().length>=4){state.adminPin=pin.value.trim(); save(state); unlocked=false; render(); flash('PIN aggiornato')}}); row.appendChild(pin);
+      row.appendChild(el('span',{className:'muted'},'Categorie:'));
+      const cn=el('input',{className:'input',placeholder:'Nome cat.'}); const ca=el('input',{className:'input',type:'number',step:'0.01',placeholder:'€ (vuoto = nessun importo)'}); const addC=el('button',{className:'btn',onClick:()=>{const n=cn.value.trim(); const v=ca.value.trim(); if(!n)return alert('Nome categoria obbligatorio'); state.categories.push({id:uid(),name:n,amount:(v===''?null:Number(v))}); cn.value=''; ca.value=''; save(state); render(); schedulePush()}},'Aggiungi categoria');
+      row.appendChild(cn); row.appendChild(ca); row.appendChild(addC);
+      const ul=el('ul',{style:'list-style:none;padding:0;margin:6px 0;width:100%'}); state.categories.forEach(c=>{const li=el('li',{className:'row'}); const n=el('input',{className:'input',value:c.name}); const a=el('input',{className:'input',type:'number',step:'0.01',value:(c.amount==null?'':c.amount)}); const del=el('button',{className:'btn ghost'},'✕'); n.addEventListener('blur',()=>{c.name=n.value; save(state); schedulePush()}); a.addEventListener('blur',()=>{const v=a.value.trim(); c.amount=(v===''?null:Number(v)); save(state); schedulePush()}); del.addEventListener('click',()=>{state.categories=state.categories.filter(x=>x.id!==c.id); save(state); render(); schedulePush()}); li.appendChild(n); li.appendChild(a); li.appendChild(del); ul.appendChild(li)});
+      row.appendChild(ul);
+      row.appendChild(el('span',{className:'muted'},'Sync Supabase (REST):'));
+      const url=el('input',{className:'input',placeholder:'Supabase URL (https://xxx.supabase.co)',value:state.sbUrl});
+      const anon=el('input',{className:'input',placeholder:'Anon key',value:state.sbAnon});
+      const slug=el('input',{className:'input',placeholder:'Team slug',value:state.teamSlug});
+      url.addEventListener('input',()=>{state.sbUrl=url.value; save(state)}); anon.addEventListener('input',()=>{state.sbAnon=anon.value; save(state)}); slug.addEventListener('input',()=>{state.teamSlug=slug.value; save(state)});
+      row.appendChild(url); row.appendChild(anon); row.appendChild(slug);
+      card.appendChild(row); grid.appendChild(card);
+    }
+  }
+
+  function exportCSV(){
+    const header=['Data','Giocatore','Motivo','Importo','Categoria','Paste?'].join(',');
+    const lines=state.fines.map(f=>{const p=state.players.find(x=>x.id===f.playerId); const name=p?p.name:'Sconosciuto'; const cat=f.categoryId?(state.categories.find(c=>c.id===f.categoryId)?.name||''):(f.isPaste?'Paste':''); return [f.date,name,(f.reason||'').replaceAll(',',';'),String(f.amount).replace('.',','),cat,f.isPaste?'Sì':'No'].join(',')});
+    const csv=[header,...lines].join('\n'); const blob=new Blob([String.fromCharCode(65279),csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`multe_${state.seasonName.replaceAll(' ','_')}.csv`; a.click(); URL.revokeObjectURL(url);
+  }
+  function exportJSON(){const payload={players:state.players,fines:state.fines,seasonName:state.seasonName,categories:state.categories}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='sicilybvs-backup.json'; a.click(); URL.revokeObjectURL(url);}
+
+  render(); if(supa.active){supa.pull(); setInterval(()=>supa.pull(),30000)}
+})();
+</script>
+</body></html>
