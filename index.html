@@ -45,6 +45,11 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
   const fmtIT=iso=>{try{const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`}catch{return iso}};
   const uid=()=>`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
+  // === Config Supabase di default per modalità pubblica (sola lettura) ===
+  const DEFAULT_SUPA_URL  = "https://pbzzfhfnpnackeltfcrkw.supabase.co";       // <-- il tuo Project URL
+  const DEFAULT_SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBienpmaGZwbmFja2VsZnRjcmt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTA2NjcsImV4cCI6MjA3Nzk4NjY2N30.vPh4xJL5RfzyLuUhbR1SCXVRTAIjKVo0WuoSSlmYJ24";                               // <-- INCOLLA qui la tua anon public key
+  const DEFAULT_TEAM_SLUG = "sicily-bvs";
+
   // ---------- IndexedDB (persistenza offline robusta) ----------
   const IDB_NAME='sicilybvs-idb', IDB_STORE='kv', IDB_KEY='state';
   function idbOpen(){
@@ -109,7 +114,8 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         {id:uid(),name:"Paste",amount:null}
       ],
       sbUrl:"", sbAnon:"", teamSlug:"sicily-bvs",
-      cloudTs:0
+      cloudTs:0,
+      _readonlyPublic:false
     };
   }
 
@@ -141,7 +147,17 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       }catch{return {ok:false,reason:'fetch'}}
     }
   };
-  let pushTimer=null; function schedulePush(){ if(!supa.active) return; clearTimeout(pushTimer); pushTimer=setTimeout(async()=>{const res=await supa.upsert(); if(res.ok&&res.ts){state.cloudTs=res.ts; saveLocal(state); flash('Salvato nel cloud')}},1200); }
+
+  // schedulePush: in sola lettura o senza PIN → NO PUSH
+  let pushTimer=null;
+  function schedulePush(){
+    if (state._readonlyPublic || !unlocked || !supa.active) return;
+    clearTimeout(pushTimer);
+    pushTimer=setTimeout(async()=>{
+      const res=await supa.upsert();
+      if(res.ok&&res.ts){ state.cloudTs=res.ts; saveLocal(state); flash('Salvato nel cloud'); }
+    },1200);
+  }
 
   function totalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t}
   function pasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{if(f.isPaste) t[f.playerId]=(t[f.playerId]||0)+1}); return t}
@@ -153,7 +169,11 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
 
   function renderActions(){
     const box=$('#actions'); box.innerHTML='';
-    if(!unlocked){ box.appendChild(el('button',{className:'btn',onClick:()=>{const p=prompt('PIN admin'); if(p===state.adminPin){unlocked=true; render()} else alert('PIN errato')}},'PIN')); return; }
+    if(!unlocked){
+      if (state._readonlyPublic) box.appendChild(el('span',{className:'muted'},'Vista pubblica (solo lettura)'));
+      box.appendChild(el('button',{className:'btn',onClick:()=>{const p=prompt('PIN admin'); if(p===state.adminPin){unlocked=true; state._readonlyPublic=false; render()} else alert('PIN errato')}},'PIN'));
+      return;
+    }
     const inp=el('input',{className:'input',value:state.seasonName,title:'Stagione'}); inp.addEventListener('input',()=>{state.seasonName=inp.value; saveLocal(state); schedulePush()}); box.appendChild(inp);
     box.appendChild(el('button',{className:'btn',onClick:exportCSV},'CSV'));
     box.appendChild(el('button',{className:'btn',onClick:exportJSON},'Backup'));
@@ -161,7 +181,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
     box.appendChild(lab);
     const force=el('button',{className:'btn',onClick:async()=>{const res=await supa.pull(); if(res&&res.ok&&res.payload){applyCloud(res.ts,res.payload,true)}}},'Forza sync');
     box.appendChild(force);
-    box.appendChild(el('button',{className:'btn',onClick:()=>{unlocked=false; render()}},'Esci'));
+    box.appendChild(el('button',{className:'btn',onClick:()=>{unlocked=false; state._readonlyPublic=true; render()}},'Esci'));
   }
 
   function applyCloud(ts,payload,notify){
@@ -280,7 +300,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       const card=el('div',{className:'card',style:'grid-column:1 / -1'});
       card.appendChild(el('div',{className:'title'},'Impostazioni (admin)'));
       const row=el('div',{className:'row'});
-      const pin=el('input',{className:'input',placeholder:'Nuovo PIN (Enter)'}); pin.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&pin.value.trim().length>=4){state.adminPin=pin.value.trim(); saveLocal(state); unlocked=false; render(); flash('PIN aggiornato')}}); row.appendChild(pin);
+      const pin=el('input',{className:'input',placeholder:'Nuovo PIN (Enter)'}); pin.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&pin.value.trim().length>=4){state.adminPin=pin.value.trim(); saveLocal(state); unlocked=false; state._readonlyPublic=true; render(); flash('PIN aggiornato')}}); row.appendChild(pin);
       row.appendChild(el('span',{className:'muted'},'Categorie:'));
       const cn=el('input',{className:'input',placeholder:'Nome cat.'}); const ca=el('input',{className:'input',type:'number',step:'0.01',placeholder:'€ (vuoto = nessun importo)'}); const addC=el('button',{className:'btn',onClick:()=>{const n=cn.value.trim(); const v=ca.value.trim(); if(!n)return alert('Nome categoria obbligatorio'); state.categories.push({id:uid(),name:n,amount:(v===''?null:Number(v))}); cn.value=''; ca.value=''; saveLocal(state); render(); schedulePush()}},'Aggiungi categoria');
       row.appendChild(cn); row.appendChild(ca); row.appendChild(addC);
@@ -304,14 +324,21 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
   }
   function exportJSON(){const payload={players:state.players,fines:state.fines,seasonName:state.seasonName,categories:state.categories}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='sicilybvs-backup.json'; a.click(); URL.revokeObjectURL(url);}
 
-  // ---- Bootstrap: carica da IDB/local, poi prova cloud ----
+  // ---- Bootstrap: carica da IDB/local, poi modalità pubblica + cloud ----
   (async function boot(){
     state = (await loadLocal()) || defaultState();
-    // salva subito in IDB in caso provenisse da localStorage
-    saveLocal(state);
-    // render locale immediato
+
+    // Se non ci sono parametri locali, usa quelli pubblici e resta in sola lettura
+    if ((!state.sbUrl || !state.sbAnon || !state.teamSlug) && DEFAULT_SUPA_URL && DEFAULT_SUPA_ANON && DEFAULT_TEAM_SLUG){
+      state.sbUrl    = DEFAULT_SUPA_URL;
+      state.sbAnon   = DEFAULT_SUPA_ANON;
+      state.teamSlug = DEFAULT_TEAM_SLUG;
+      state._readonlyPublic = true; // finché non inserisci il PIN
+    }
+
+    saveLocal(state); // persisti subito
     render();
-    // se cloud attivo → pull e applica se più nuovo
+
     if(supa.active){
       const res=await supa.pull();
       if(res && res.ok && res.ts && res.ts > (state.cloudTs||0)) applyCloud(res.ts,res.payload,true);
