@@ -1,30 +1,79 @@
 <!doctype html><html lang="it"><head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, viewport-fit=cover">
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
-:root{--gold:#D4A000;--blue:#1C75BC;--ink:#0b0b0f}
-*{box-sizing:border-box}html,body{height:100%}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--ink);background:linear-gradient(180deg,#e9f2ff,#fef9e6)}
-.wrap{min-height:100%;display:flex;justify-content:center;padding:16px}
-.container{width:min(980px,100%)}
-.head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
-.brand{display:flex;gap:10px;align-items:center}
-.logo{width:52px;height:52px;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.input{padding:10px 12px;border:1px solid #d4d4dd;border-radius:10px;background:#fff;min-height:38px}
-.btn{padding:9px 12px;border-radius:10px;border:0;background:var(--blue);color:#fff;cursor:pointer}
-.btn.ghost{background:transparent;color:#dc2626;border:1px solid #f0caca}
-.grid{display:grid;grid-template-columns:1fr;gap:12px}
-@media(min-width:880px){.grid{grid-template-columns:1fr 1fr}}
-.card{background:#fff;border-top:4px solid var(--gold);border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.06);padding:12px}
-.title{font-size:1.05rem;font-weight:700;margin:0 0 8px}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.table{width:100%;border-collapse:collapse;font-size:.95rem}
-.table th,.table td{padding:8px;border-bottom:1px solid #eee;text-align:left}
-.right{text-align:right}.muted{opacity:.75}
-.badge{background:var(--blue);color:#fff;border-radius:999px;padding:2px 8px;font-size:.75rem;margin-left:6px}
-.chip{background:#fff8e1;border:1px solid #ffe2a3;border-radius:999px;padding:4px 8px;font-weight:600}
+/* --- base mobile-safe: niente overflow orizzontale, layout fluido --- */
+html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+* { box-sizing: border-box; }
+
+/* tema */
+:root { --gold:#D4A000; --blue:#1C75BC; --ink:#0b0b0f; }
+
+/* tipografia fluida: si riduce automaticamente sui telefoni */
+html { font-size: clamp(14px, 2.1vw, 16px); }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, #e9f2ff, #fef9e6);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* contenitore */
+.wrap { min-height: 100%; display: flex; justify-content: center; padding: 16px; }
+.container { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 10px; }
+
+/* header */
+.head { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; }
+.brand { display: flex; gap: 10px; align-items: center; }
+.logo { width: 52px; height: 52px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+
+/* input & bottoni (anche questi si riducono un po') */
+.input { padding: 10px 12px; border: 1px solid #d4d4dd; border-radius: 10px; background: #fff; min-height: 38px; font-size: clamp(.92rem, 2.6vw, 1rem); }
+.btn { padding: 9px 12px; border-radius: 10px; border: 0; background: var(--blue); color: #fff; cursor: pointer; font-size: clamp(.92rem, 2.6vw, 1rem); }
+.btn.ghost { background: transparent; color: #dc2626; border: 1px solid #f0caca; }
+
+/* griglia */
+.grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 880px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+/* card */
+.card { background: #fff; border-top: 4px solid var(--gold); border-radius: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.06); padding: 12px; }
+.title { font-size: clamp(1.05rem, 3.4vw, 1.35rem); font-weight: 700; margin: 0 0 8px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* tabelle: rientrano SEMPRE nello schermo, niente scroll orizzontale */
+.table { width: 100%; border-collapse: collapse; font-size: clamp(.86rem, 2.5vw, .95rem); table-layout: auto; }
+.table th, .table td {
+  padding: clamp(6px, 1.2vw, 10px);
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  vertical-align: middle;
+  word-break: normal;      /* niente spezzettamento lettera-per-lettera */
+  white-space: normal;     /* permetti di andare a capo */
+  hyphens: auto;           /* manda a capo “bene” le parole lunghe */
+}
+
+/* numeri compatti e su una riga */
+.right, .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* dettagli estetici */
+.muted { opacity: .75; }
+.badge { background: var(--blue); color: #fff; border-radius: 999px; padding: 2px 8px; font-size: .75rem; margin-left: 6px; }
+.chip { background: #fff8e1; border: 1px solid #ffe2a3; border-radius: 999px; padding: 4px 8px; font-weight: 600; }
+.foot { opacity: .7; font-size: .9rem; margin-top: 8px; }
+
+/* telefoni piccoli: stringi un altro filo */
+@media (max-width: 390px) {
+  .logo { width: 44px; height: 44px; }
+  .table { font-size: .83rem; }
+  .table th, .table td { padding: 5px 6px; }
+  .input, .btn { min-height: 34px; padding: 8px 10px; }
+}
 </style>
 </head><body>
 <div class="wrap"><div class="container">
