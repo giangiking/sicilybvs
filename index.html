@@ -1,5 +1,6 @@
 <!doctype html><html lang="it"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
@@ -24,13 +25,15 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
 .right{text-align:right}.muted{opacity:.75}
 .badge{background:var(--blue);color:#fff;border-radius:999px;padding:2px 8px;font-size:.75rem;margin-left:6px}
 .chip{background:#fff8e1;border:1px solid #ffe2a3;border-radius:999px;padding:4px 8px;font-weight:600}
+.table-wrap{overflow:auto}
+.foot{opacity:.7;font-size:.9rem;margin-top:8px}
 </style>
 </head><body>
 <div class="wrap"><div class="container">
   <div class="head">
     <div class="brand">
       <img src="/logo.png" class="logo" alt="Sicily BVS">
-      <div><div style="font-weight:800">Multe Pallavolo – Sicily BVS</div><div class="muted">Accesso riservato all’amministratore con PIN.</div></div>
+      <div><div style="font-weight:800">Multe Pallavolo – Sicily BVS</div><div class="muted">Tutti vedono tutto – solo l’admin modifica (PIN).</div></div>
     </div>
     <div class="row" id="actions"></div>
   </div>
@@ -39,67 +42,31 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
 
 <script>
 (function(){
+  // ---------- Utility ----------
   const $=(s,e=document)=>e.querySelector(s);
-  const fmt=n=>new Intl.NumberFormat(undefined,{style:'currency',currency:'EUR'}).format(n||0);
+  const fmt=n=>new Intl.NumberFormat(undefined,{style:'currency',currency:'EUR'}).format(Number(n||0));
   const todayISO=()=>new Date().toISOString().slice(0,10);
   const fmtIT=iso=>{try{const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`}catch{return iso}};
   const uid=()=>`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
-  // === Config Supabase di default per modalità pubblica (sola lettura) ===
-  const DEFAULT_SUPA_URL  = "https://nsmubyeiicceravtvpvm.supabase.co";       // <-- il tuo Project URL
-  const DEFAULT_SUPA_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbXVieWVpaWNjZXJhdnR2cHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTUxNjAsImV4cCI6MjA3Nzk5MTE2MH0.PCgKIZYRrpY-uxlCHt48xJ_DWuZvbHMh5X_kPFd6rC8";                               // <-- INCOLLA qui la tua anon public key
-  const DEFAULT_TEAM_SLUG = "sicily-bvs";
-
-  // ---------- IndexedDB (persistenza offline robusta) ----------
+  // ---------- IndexedDB per robustezza ----------
   const IDB_NAME='sicilybvs-idb', IDB_STORE='kv', IDB_KEY='state';
-  function idbOpen(){
-    return new Promise((resolve,reject)=>{
-      const req=indexedDB.open(IDB_NAME,1);
-      req.onupgradeneeded=()=>{const db=req.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE)};
-      req.onsuccess=()=>resolve(req.result);
-      req.onerror=()=>reject(req.error);
-    });
-  }
-  async function idbGet(){
-    try{
-      const db=await idbOpen();
-      return new Promise((resolve,reject)=>{
-        const tx=db.transaction(IDB_STORE,'readonly');
-        const st=tx.objectStore(IDB_STORE);
-        const g=st.get(IDB_KEY);
-        g.onsuccess=()=>resolve(g.result||null);
-        g.onerror=()=>reject(g.error);
-      });
-    }catch{ return null }
-  }
-  async function idbSet(val){
-    try{
-      const db=await idbOpen();
-      return new Promise((resolve,reject)=>{
-        const tx=db.transaction(IDB_STORE,'readwrite');
-        const st=tx.objectStore(IDB_STORE);
-        st.put(val,IDB_KEY);
-        tx.oncomplete=()=>resolve(true);
-        tx.onerror=()=>reject(tx.error);
-      });
-    }catch{ /* ignore */ }
-  }
+  function idbOpen(){return new Promise((resolve,reject)=>{const req=indexedDB.open(IDB_NAME,1); req.onupgradeneeded=()=>{const db=req.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE)}; req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error)});}
+  async function idbGet(){try{const db=await idbOpen(); return await new Promise((resolve,reject)=>{const tx=db.transaction(IDB_STORE,'readonly'); const st=tx.objectStore(IDB_STORE); const g=st.get(IDB_KEY); g.onsuccess=()=>resolve(g.result||null); g.onerror=()=>reject(g.error);});}catch{return null}}
+  async function idbSet(val){try{const db=await idbOpen(); return await new Promise((resolve,reject)=>{const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).put(val,IDB_KEY); tx.oncomplete=()=>resolve(true); tx.onerror=()=>reject(tx.error);});}catch{}}
 
-  // ---------- Storage helpers (LocalStorage + IndexedDB) ----------
+  // ---------- Storage helpers ----------
   const LS='sicilybvs-data-v1';
-  const saveLocal=s=>{const j=JSON.stringify(s);try{localStorage.setItem(LS,j)}catch{}try{sessionStorage.setItem(LS,j)}catch{} idbSet(s)};
-  const loadLocal=async()=>{ // preferisci IndexedDB; fallback a localStorage
-    try{
-      const fromIdb=await idbGet(); if(fromIdb && typeof fromIdb==='object') return fromIdb;
-    }catch{}
-    try{const r=localStorage.getItem(LS)||sessionStorage.getItem(LS); return r?JSON.parse(r):null}catch{return null}
-  };
+  const saveLocal=s=>{const j=JSON.stringify(s); try{localStorage.setItem(LS,j)}catch{} try{sessionStorage.setItem(LS,j)}catch{} idbSet(s)};
+  const loadLocal=async()=>{try{const fromIdb=await idbGet(); if(fromIdb && typeof fromIdb==='object') return fromIdb;}catch{} try{const r=localStorage.getItem(LS)||sessionStorage.getItem(LS); return r?JSON.parse(r):null}catch{return null}};
 
+  // ---------- Default data ----------
   const DEF_PLAYERS=["Renato Russo","Gianluigi Gogliandolo","Roberto Cazzaniga","Marco Alaimo","Lorenza Alcantarini","Pierluigi Ardiri","Niccolò Baldaccini","Joaquin Mago","Davide Pietroni","Simone Pisani","Carmelo Mazza","Stefano Remo","Fabio Remo","Gabriele Rizzo","Giorgio Sulfaro"];
   const DEF_PIN="2659";
 
-  // Stato (inizializzazione asincrona per leggere IndexedDB prima di rendere)
+  // ---------- Stato ----------
   let state=null, unlocked=false;
+
   function defaultState(){
     const y=new Date().getFullYear();
     return {
@@ -113,13 +80,15 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         {id:uid(),name:"Maglia dimenticata",amount:1},
         {id:uid(),name:"Paste",amount:null}
       ],
-      sbUrl:"", sbAnon:"", teamSlug:"sicily-bvs",
-      cloudTs:0,
-      _readonlyPublic:false
+      // Supabase preconfigurato
+      sbUrl:"https://pbzzfhfpnackeltfcrkw.supabase.co",
+      sbAnon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBienpmaGZwbmFja2VsZnRjcmt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTA2NjcsImV4cCI6MjA3Nzk4NjY2N30.vPh4xJL5RfzyLuUhbR1SCXVRTAIjKVo0WuoSSlmYJ24",
+      teamSlug:"sicily-bvs",
+      cloudTs:0
     };
   }
 
-  // ---------- Supabase REST ----------
+  // ---------- Supabase via REST ----------
   const supa={
     get active(){return !!(state.sbUrl&&state.sbAnon&&state.teamSlug)},
     base(){return state.sbUrl.replace(/\/+$/,'')},
@@ -134,7 +103,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         const arr=await r.json(); if(!arr||!arr[0]) return {ok:true,empty:true};
         const ts=new Date(arr[0].updated_at||0).getTime();
         return {ok:true,ts,payload:(arr[0].payload||{})};
-      }catch{return {ok:false,reason:'fetch'}}
+      }catch(e){console.warn('pull error',e); return {ok:false,reason:'fetch'};}
     },
     async upsert(){
       if(!supa.active) return {ok:false,reason:'inactive'};
@@ -144,44 +113,63 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         if(!r.ok) return {ok:false,reason:'http-'+r.status};
         const arr=await r.json(); const ts=new Date(arr[0]?.updated_at||0).getTime();
         return {ok:true,ts};
-      }catch{return {ok:false,reason:'fetch'}}
+      }catch(e){console.warn('upsert error',e); return {ok:false,reason:'fetch'};}
     }
   };
-
-  // schedulePush: in sola lettura o senza PIN → NO PUSH
   let pushTimer=null;
   function schedulePush(){
-    if (state._readonlyPublic || !unlocked || !supa.active) return;
+    if(!unlocked || !supa.active) return;
     clearTimeout(pushTimer);
-    pushTimer=setTimeout(async()=>{
+    pushTimer=setTimeout(async ()=>{
       const res=await supa.upsert();
-      if(res.ok&&res.ts){ state.cloudTs=res.ts; saveLocal(state); flash('Salvato nel cloud'); }
+      if(res && res.ok && res.ts){ state.cloudTs=res.ts; saveLocal(state); flash('Salvato nel cloud'); }
+      else { flash('Push fallito'); }
     },1200);
   }
 
+  // ---------- Totali & conteggi ----------
   function totalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t}
   function pasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{if(f.isPaste) t[f.playerId]=(t[f.playerId]||0)+1}); return t}
   function teamTotal(){return state.fines.reduce((s,f)=>s+Number(f.amount||0),0)}
   function teamPaste(){return state.fines.reduce((s,f)=>s+(f.isPaste?1:0),0)}
 
+  // Storico / Pagate / Non pagate
+  function totalsAllByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0) }); return t;}
+  function unpaidTotalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ if(!f.paid) t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t;}
+  function paidTotalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ if(f.paid) t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t;}
+  function pasteByPlayerAll(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ if(f.isPaste) t[f.playerId]=(t[f.playerId]||0)+1 }); return t;}
+  function unpaidPasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ if(f.isPaste && !f.paid) t[f.playerId]=(t[f.playerId]||0)+1 }); return t;}
+  function paidPasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{ if(f.isPaste && f.paid) t[f.playerId]=(t[f.playerId]||0)+1 }); return t;}
+  function teamTotals(){ let all=0, unpaid=0, paid=0, pasteAll=0, pasteUnp=0, pastePaid=0;
+    state.fines.forEach(f=>{const a=Number(f.amount||0); all+=a; if(f.paid) paid+=a; else unpaid+=a; if(f.isPaste){ pasteAll++; if(f.paid) pastePaid++; else pasteUnp++; }});
+    return {all,unpaid,paid,pasteAll,pasteUnp,pastePaid};
+  }
+
+  // ---------- UI helpers ----------
   function el(tag,attrs={},children=[]){const e=document.createElement(tag); for(const k in attrs){ if(k==='className')e.className=attrs[k]; else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(),attrs[k]); else e.setAttribute(k,attrs[k]); } (Array.isArray(children)?children:[children]).forEach(c=>{ if(c==null)return; if(typeof c==='string') e.appendChild(document.createTextNode(c)); else e.appendChild(c); }); return e}
   function flash(msg){if(!msg)return; const b=el('div',{className:'chip',style:'position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:9999'},msg); document.body.appendChild(b); setTimeout(()=>b.remove(),1500)}
 
+  // ---------- Azioni (header) ----------
   function renderActions(){
     const box=$('#actions'); box.innerHTML='';
     if(!unlocked){
-      if (state._readonlyPublic) box.appendChild(el('span',{className:'muted'},'Vista pubblica (solo lettura)'));
-      box.appendChild(el('button',{className:'btn',onClick:()=>{const p=prompt('PIN admin'); if(p===state.adminPin){unlocked=true; state._readonlyPublic=false; render()} else alert('PIN errato')}},'PIN'));
+      box.appendChild(el('button',{className:'btn',onClick:()=>{const p=prompt('PIN admin'); if(p===state.adminPin){unlocked=true; render()} else alert('PIN errato')}},'PIN'));
       return;
     }
-    const inp=el('input',{className:'input',value:state.seasonName,title:'Stagione'}); inp.addEventListener('input',()=>{state.seasonName=inp.value; saveLocal(state); schedulePush()}); box.appendChild(inp);
+    // admin
+    const inp=el('input',{className:'input',value:state.seasonName,title:'Stagione'});
+    inp.addEventListener('input',()=>{state.seasonName=inp.value; saveLocal(state); schedulePush()});
+    box.appendChild(inp);
     box.appendChild(el('button',{className:'btn',onClick:exportCSV},'CSV'));
     box.appendChild(el('button',{className:'btn',onClick:exportJSON},'Backup'));
+    // Import
     const lab=el('label',{className:'btn'},['Import',el('input',{type:'file',accept:'.json,application/json',style:'display:none',onChange:(e)=>{const f=e.target.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=ev=>{try{const p=JSON.parse(ev.target.result); state.players=p.players||[]; state.fines=p.fines||[]; state.seasonName=p.seasonName||state.seasonName; state.categories=p.categories||state.categories; saveLocal(state); render(); flash('Dati importati'); schedulePush()}catch{alert('File non valido')}}; rd.readAsText(f)}})]);
     box.appendChild(lab);
-    const force=el('button',{className:'btn',onClick:async()=>{const res=await supa.pull(); if(res&&res.ok&&res.payload){applyCloud(res.ts,res.payload,true)}}},'Forza sync');
+    // Forza sync
+    const force=el('button',{className:'btn',onClick:async()=>{const res=await supa.pull(); if(res&&res.ok&&res.payload){applyCloud(res.ts,res.payload,true)}else alert('Sync fallita')}},'Forza sync');
     box.appendChild(force);
-    box.appendChild(el('button',{className:'btn',onClick:()=>{unlocked=false; state._readonlyPublic=true; render()}},'Esci'));
+    // Esci
+    box.appendChild(el('button',{className:'btn',onClick:()=>{unlocked=false; render()}},'Esci'));
   }
 
   function applyCloud(ts,payload,notify){
@@ -195,59 +183,88 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
     if(notify) flash('Sincronizzato dal cloud');
   }
 
+  // ---------- Render ----------
   function render(){
     renderActions();
     const grid=$('#grid'); grid.innerHTML='';
-    const totals=totalsByPlayer(), pastes=pasteByPlayer();
 
+    // ----- RIEPILOGO (visibile a tutti) -----
+    (function(){
+      const totalsUnp=unpaidTotalsByPlayer();      // € non pagati
+      const pastesUnp=unpaidPasteByPlayer();       // Paste non pagate
+      const tt=teamTotals();
+      const card=el('div',{className:'card'});
+      card.appendChild(el('div',{className:'title'},'Riepilogo'));
+
+      if(state.players.length===0) { card.appendChild(el('div',{className:'muted'},'Nessun giocatore.')); grid.appendChild(card); return; }
+
+      const table=el('table',{className:'table'});
+      table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Da pagare')])));
+
+      const tbody=el('tbody');
+      // ORDINAMENTO PUBBLICO: prima Paste non pagate, poi € non pagati
+      const sorted=[...state.players].sort((a,b)=>((pastesUnp[b.id]||0)-(pastesUnp[a.id]||0)) || ((totalsUnp[b.id]||0)-(totalsUnp[a.id]||0)));
+      sorted.forEach(p=>{
+        const tr=el('tr',{}); tr.appendChild(el('td',{},p.name));
+        const td=el('td',{className:'right'});
+        const wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+        wrap.appendChild(el('span',{className:'chip'}, fmt(totalsUnp[p.id]||0)));
+        wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'}, `Paste da pagare: ${pastesUnp[p.id]||0}`));
+        td.appendChild(wrap); tr.appendChild(td); tbody.appendChild(tr);
+      });
+
+      // Totale squadra (non pagato + paste non pagate)
+      const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
+      const ttCell=el('td',{className:'right',style:'font-weight:700'});
+      const w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
+      w.appendChild(document.createTextNode(fmt(tt.unpaid)));
+      w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste da pagare: ${tt.pasteUnp}`));
+      ttCell.appendChild(w); tr.appendChild(ttCell); tbody.appendChild(tr);
+
+      table.appendChild(tbody);
+      card.appendChild(el('div',{className:'table-wrap'},table));
+      grid.appendChild(card);
+    })();
+
+    // ----- GIOCATORI (SOLO ADMIN: modifica) -----
     if(unlocked){
+      const totalsPaid=paidTotalsByPlayer();
+      const pastesPaid=paidPasteByPlayer();
       const card=el('div',{className:'card'});
       card.appendChild(el('div',{className:'title'},'Giocatori (solo admin)'));
+
       const row=el('div',{className:'row',style:'margin-bottom:8px;'});
       const addInp=el('input',{className:'input',placeholder:'Aggiungi giocatore'});
       const addBtn=el('button',{className:'btn',onClick:()=>{const t=(addInp.value||'').trim(); if(!t)return; if(state.players.some(p=>p.name.toLowerCase()===t.toLowerCase()))return alert('Giocatore già presente'); state.players.push({id:uid(),name:t}); addInp.value=''; saveLocal(state); render(); schedulePush()}},'Aggiungi');
       row.appendChild(addInp); row.appendChild(addBtn); card.appendChild(row);
 
-      if(state.players.length===0) card.appendChild(el('div',{className:'muted'},'Nessun giocatore.'));
-      else{
-        const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale'),el('th',{},'')])));
+      if(state.players.length){
+        const table=el('table',{className:'table'});
+        table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Pagato'),el('th',{},'')])));
+
         const tbody=el('tbody');
-        state.players.forEach(p=>{
+        // ORDINAMENTO ADMIN: prima Paste pagate, poi € pagati
+        const sorted=[...state.players].sort((a,b)=>((pastesPaid[b.id]||0)-(pastesPaid[a.id]||0)) || ((totalsPaid[b.id]||0)-(totalsPaid[a.id]||0)));
+        sorted.forEach(p=>{
           const tr=el('tr',{}), nameTd=el('td',{}), nameInp=el('input',{className:'input',value:p.name});
           nameInp.addEventListener('blur',()=>{p.name=nameInp.value.trim(); saveLocal(state); render(); schedulePush()}); nameTd.appendChild(nameInp);
           const totTd=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); totTd.appendChild(wrap);
+          wrap.appendChild(el('span',{className:'chip'},fmt(totalsPaid[p.id]||0)));
+          wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste pagate: ${pastesPaid[p.id]||0}`));
+          totTd.appendChild(wrap);
           const delTd=el('td',{className:'right'}); delTd.appendChild(el('button',{className:'btn ghost',onClick:()=>{if(!confirm('Eliminare il giocatore?'))return; state.players=state.players.filter(x=>x.id!==p.id); saveLocal(state); render(); schedulePush()}},'✕'));
           tr.appendChild(nameTd); tr.appendChild(totTd); tr.appendChild(delTd); tbody.appendChild(tr);
         });
-        const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
-        const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
-        tr.appendChild(tt); tr.appendChild(el('td',{},'')); tbody.appendChild(tr);
+
         table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
-      }
-      grid.appendChild(card);
-    } else {
-      const card=el('div',{className:'card'});
-      card.appendChild(el('div',{className:'title'},'Riepilogo'));
-      if(state.players.length===0) card.appendChild(el('div',{className:'muted'},'Nessun giocatore.'));
-      else{
-        const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale')])));
-        const tbody=el('tbody');
-        state.players.forEach(p=>{const tr=el('tr',{}); tr.appendChild(el('td',{},p.name));
-          const td=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); td.appendChild(wrap);
-          tr.appendChild(td); tbody.appendChild(tr)});
-        const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
-        const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
-        tr.appendChild(tt); tbody.appendChild(tr); table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
       }
       grid.appendChild(card);
     }
 
+    // ----- NUOVA MULTA (solo admin) -----
     if(unlocked){
-      const card=el('div',{className:'card'}); card.appendChild(el('div',{className:'title'},'Nuova multa (solo admin)'));
+      const card=el('div',{className:'card'});
+      card.appendChild(el('div',{className:'title'},'Nuova multa (solo admin)'));
       const row=el('div',{className:'row'});
       const catSel=el('select',{className:'input'}); catSel.appendChild(el('option',{value:''},'Categoria…')); state.categories.forEach(c=>catSel.appendChild(el('option',{value:c.id},`${c.name} ${c.amount!=null?`(${c.amount}€)`:'(—)'}`)));
       const playerSel=el('select',{className:'input'}); playerSel.appendChild(el('option',{value:''},'Giocatore…')); state.players.forEach(p=>playerSel.appendChild(el('option',{value:p.id},p.name)));
@@ -257,7 +274,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       const addBtn=el('button',{className:'btn'},'Aggiungi');
       const resetBtn=el('button',{className:'btn'},'Azzera stagione');
 
-      function syncAmtDisabled(){const c=state.categories.find(x=>x.id===catSel.value); amtInp.disabled=!!(c&&(c.name==='Paste'||c.amount==null)); if(!amtInp.disabled&&c&&c.amount!=null)amtInp.value=c.amount; if(amtInp.disabled)amtInp.value=''}
+      function syncAmtDisabled(){const c=state.categories.find(x=>x.id===catSel.value); const disable = !!(c&&(c.name==='Paste'||c.amount==null)); amtInp.disabled=disable; if(!disable&&c&&c.amount!=null)amtInp.value=c.amount; if(disable)amtInp.value=''}
       catSel.addEventListener('change',syncAmtDisabled); syncAmtDisabled();
 
       addBtn.addEventListener('click',()=>{
@@ -266,7 +283,10 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         const isPaste=!!(cat&&(cat.name==='Paste'||cat.amount==null));
         const val=isPaste?0:Number(amtInp.value);
         if(!isPaste&&(isNaN(val)||val<=0)) return alert('Importo non valido');
-        state.fines.unshift({id:uid(),playerId:pid,amount:val,reason:(reasonInp.value||'').trim(),date:dateInp.value||todayISO(),categoryId:cat?cat.id:null,isPaste});
+        state.fines.unshift({
+          id:uid(),playerId:pid,amount:val,reason:(reasonInp.value||'').trim(),date:dateInp.value||todayISO(),
+          categoryId:cat?cat.id:null,isPaste, paid:false, paid_at:null
+        });
         saveLocal(state); render(); schedulePush();
         reasonInp.value=''; amtInp.value=''; dateInp.value=todayISO(); playerSel.value=''; catSel.value=''; syncAmtDisabled();
       });
@@ -276,69 +296,251 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       card.appendChild(row); grid.appendChild(card);
     }
 
-    const card=el('div',{className:'card',style:'grid-column:1 / -1'}); card.appendChild(el('div',{className:'title'},'Dettaglio multe'));
-    if(state.fines.length===0) card.appendChild(el('div',{className:'muted'},'Ancora nessuna multa.'));
-    else{
-      const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Data'),el('th',{},'Giocatore'),el('th',{},'Motivo'),el('th',{},'Categoria'),el('th',{className:'right'},'€'),unlocked?el('th',{},''):null].filter(Boolean))));
+    // ----- DETTAGLIO MULTE (visibile a tutti; modificabile solo admin) -----
+    (function(){
+      const card=el('div',{className:'card',style:'grid-column:1 / -1'});
+      card.appendChild(el('div',{className:'title'},'Dettaglio multe'));
+      if(state.fines.length===0){ card.appendChild(el('div',{className:'muted'},'Ancora nessuna multa.')); grid.appendChild(card); return; }
+
+      const table=el('table',{className:'table'});
+      table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Data'),el('th',{},'Giocatore'),el('th',{},'Motivo'),el('th',{},'Categoria'),el('th',{className:'right'},'€'), unlocked?el('th',{},''):null].filter(Boolean))));
       const tbody=el('tbody');
+
       state.fines.forEach(f=>{
         const tr=el('tr',{});
-        const tdDate=el('td',{}); if(unlocked){const di=el('input',{className:'input',type:'date',value:f.date}); di.addEventListener('change',()=>{f.date=di.value; saveLocal(state); schedulePush()}); tdDate.appendChild(di)} else tdDate.textContent=fmtIT(f.date);
-        const tdPl=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'Sconosciuto')); state.players.forEach(p=>sel.appendChild(el('option',{value:p.id,selected:p.id===f.playerId},p.name))); sel.value = f.playerId || ''; sel.addEventListener('change',()=>{f.playerId=sel.value; saveLocal(state); schedulePush()}); tdPl.appendChild(sel)} else {const pl=state.players.find(x=>x.id===f.playerId); tdPl.textContent=pl?pl.name:'Sconosciuto'}
-        const tdRe=el('td',{}); if(unlocked){const ri=el('input',{className:'input',value:f.reason||''}); ri.addEventListener('input',()=>{f.reason=ri.value; saveLocal(state)}); ri.addEventListener('blur',()=>{schedulePush()}); tdRe.appendChild(ri)} else tdRe.textContent=f.reason||'';
-        const tdCa=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'(nessuna)')); state.categories.forEach(c=>sel.appendChild(el('option',{value:c.id,selected:(f.categoryId||'')===c.id},c.name))); sel.value = f.categoryId || (f.isPaste ? (state.categories.find(c=>c.name==='Paste')?.id || '') : ''); sel.addEventListener('change',()=>{f.categoryId=sel.value||null; const c=state.categories.find(x=>x.id===f.categoryId); f.isPaste=!!(c&&(c.name==='Paste'||c.amount==null)); if(f.isPaste)f.amount=0; saveLocal(state); render(); schedulePush()}); tdCa.appendChild(sel)} else {const c=state.categories.find(x=>x.id===f.categoryId); tdCa.textContent=c?c.name:(f.isPaste?'Paste':'')}
-        const tdAm=el('td',{className:'right'}); if(unlocked){const ai=el('input',{className:'input',type:'number',step:'0.01',value:f.amount}); if(f.isPaste) ai.disabled=true; ai.addEventListener('input',()=>{f.amount=Number(ai.value||0)}); ai.addEventListener('blur',()=>{saveLocal(state); schedulePush()}); tdAm.appendChild(ai)} else tdAm.textContent=fmt(f.amount);
+
+        // Data
+        const tdDate=el('td',{}); 
+        if(unlocked){
+          const di=el('input',{className:'input',type:'date',value:f.date}); 
+          di.addEventListener('change',()=>{f.date=di.value; saveLocal(state); schedulePush()}); 
+          tdDate.appendChild(di);
+        } else tdDate.textContent=fmtIT(f.date);
+
+        // Giocatore
+        const tdPl=el('td',{}); 
+        if(unlocked){
+          const sel=el('select',{className:'input'}); 
+          sel.appendChild(el('option',{value:''},'Sconosciuto')); 
+          state.players.forEach(p=> sel.appendChild(el('option',{value:p.id},p.name)) );
+          sel.value = f.playerId || '';
+          sel.addEventListener('change',()=>{ f.playerId=sel.value||null; saveLocal(state); schedulePush()});
+          tdPl.appendChild(sel);
+        } else {
+          const pl=state.players.find(x=>x.id===f.playerId);
+          tdPl.textContent=pl?pl.name:'Sconosciuto';
+        }
+
+        // Motivo
+        const tdRe=el('td',{}); 
+        if(unlocked){
+          const ri=el('input',{className:'input',value:f.reason||''}); 
+          ri.addEventListener('input',()=>{f.reason=ri.value}); 
+          ri.addEventListener('blur',()=>{saveLocal(state); schedulePush()}); 
+          tdRe.appendChild(ri);
+        } else tdRe.textContent=f.reason||'';
+
+        // Categoria
+        const tdCa=el('td',{}); 
+        if(unlocked){
+          const sel=el('select',{className:'input'}); 
+          sel.appendChild(el('option',{value:''},'(nessuna)')); 
+          state.categories.forEach(c=> sel.appendChild(el('option',{value:c.id},c.name)) );
+          sel.value = f.categoryId || (f.isPaste ? (state.categories.find(c=>c.name==='Paste')?.id || '') : '');
+          sel.addEventListener('change',()=>{ f.categoryId=sel.value||null; const c=state.categories.find(x=>x.id===f.categoryId); f.isPaste=!!(c&&(c.name==='Paste'||c.amount==null)); if(f.isPaste) f.amount=0; saveLocal(state); render(); schedulePush()});
+          tdCa.appendChild(sel);
+        } else {
+          const c=state.categories.find(x=>x.id===f.categoryId);
+          tdCa.textContent=c?c.name:(f.isPaste?'Paste':'');
+        }
+
+        // Importo + Pagata
+        const tdAm = el('td',{className:'right'});
+        if(unlocked){
+          const wrap = el('div',{style:'display:flex;gap:8px;align-items:center;justify-content:flex-end'});
+          const ai = el('input',{className:'input',type:'number',step:'0.01',value:f.amount});
+          if(f.isPaste) ai.disabled=true;
+          ai.addEventListener('input',()=>{ f.amount = Number(ai.value||0) });
+          ai.addEventListener('blur',()=>{ saveLocal(state); schedulePush() });
+
+          const chk = el('input',{type:'checkbox'});
+          chk.checked = !!f.paid;
+          chk.title = 'Segna come pagata';
+          chk.addEventListener('change',()=>{
+            f.paid = chk.checked;
+            f.paid_at = f.paid ? todayISO() : null;
+            saveLocal(state); render(); schedulePush();
+          });
+
+          const badge = f.paid ? el('span',{className:'chip'},'Pagata') : null;
+
+          wrap.appendChild(ai);
+          wrap.appendChild(el('label',{},[chk, document.createTextNode(' Pagata')]));
+          if(badge) wrap.appendChild(badge);
+          tdAm.appendChild(wrap);
+        } else {
+          const txt = f.paid ? `${fmt(f.amount)} (pagata)` : fmt(f.amount);
+          tdAm.textContent = txt;
+        }
+
         tr.appendChild(tdDate); tr.appendChild(tdPl); tr.appendChild(tdRe); tr.appendChild(tdCa); tr.appendChild(tdAm);
-        if(unlocked){const tdDel=el('td',{className:'right'}); tdDel.appendChild(el('button',{className:'btn ghost',onClick:()=>{state.fines=state.fines.filter(x=>x.id!==f.id); saveLocal(state); render(); schedulePush()}},'Elimina')); tr.appendChild(tdDel)}
+
+        // Elimina (solo admin)
+        if(unlocked){
+          const tdDel=el('td',{className:'right'}); 
+          tdDel.appendChild(el('button',{className:'btn ghost',onClick:()=>{if(!confirm('Eliminare la multa?'))return; state.fines=state.fines.filter(x=>x.id!==f.id); saveLocal(state); render(); schedulePush()}},'Elimina'));
+          tr.appendChild(tdDel);
+        }
+
         tbody.appendChild(tr);
       });
-      table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
-    }
-    grid.appendChild(card);
 
+      table.appendChild(tbody);
+      card.appendChild(el('div',{className:'table-wrap'},table));
+      grid.appendChild(card);
+    })();
+
+    // ----- STATISTICHE (visibile a tutti) -----
+    (function(){
+      const stats = el('div',{className:'card',style:'grid-column:1 / -1'});
+      stats.appendChild(el('div',{className:'title'},'Statistiche (storico)'));
+      const tAll = totalsAllByPlayer();
+      const tUnp = unpaidTotalsByPlayer();
+      const tPaid= paidTotalsByPlayer();
+      const pAll = pasteByPlayerAll();
+      const pUnp = unpaidPasteByPlayer();
+      const pPaid= paidPasteByPlayer();
+      const rows = state.players.map(p=>({
+        name: p.name, id: p.id,
+        euro_tot: tAll[p.id]||0,
+        euro_unp: tUnp[p.id]||0,
+        euro_paid:tPaid[p.id]||0,
+        paste_all: pAll[p.id]||0,
+        paste_unp: pUnp[p.id]||0,
+        paste_paid: pPaid[p.id]||0,
+        count: state.fines.filter(f=>f.playerId===p.id).length
+      }));
+      const tbl = el('table',{className:'table'});
+      tbl.appendChild(el('thead',{},el('tr',{},[
+        el('th',{},'Giocatore'),
+        el('th',{className:'right'},'€ totali'),
+        el('th',{className:'right'},'€ da pagare'),
+        el('th',{className:'right'},'€ pagati'),
+        el('th',{className:'right'},'Paste totali'),
+        el('th',{className:'right'},'Paste da pagare'),
+        el('th',{className:'right'},'Paste pagate'),
+        el('th',{className:'right'},'# multe')
+      ])));
+      const tb=el('tbody');
+      rows.forEach(r=>{
+        const tr=el('tr',{});
+        tr.appendChild(el('td',{},r.name));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_tot)));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_unp)));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_paid)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_all)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_unp)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_paid)));
+        tr.appendChild(el('td',{className:'right'},String(r.count)));
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb);
+      stats.appendChild(tbl);
+      grid.appendChild(stats);
+    })();
+
+    // ----- LEGENDA (visibile a tutti) -----
+    (function(){
+      const leg = el('div',{className:'card'});
+      leg.appendChild(el('div',{className:'title'},'Legenda categorie'));
+      if(state.categories.length===0){
+        leg.appendChild(el('div',{className:'muted'},'Nessuna categoria definita.'));
+      } else {
+        const tbl = el('table',{className:'table'});
+        tbl.appendChild(el('thead',{},el('tr',{},[ el('th',{},'Categoria'), el('th',{className:'right'},'Importo') ])));
+        const tb = el('tbody');
+        state.categories.forEach(c=>{
+          const tr = el('tr',{});
+          tr.appendChild(el('td',{},c.name));
+          tr.appendChild(el('td',{className:'right'}, c.amount==null ? '—' : fmt(Number(c.amount)) ));
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb);
+        leg.appendChild(tbl);
+      }
+      grid.appendChild(leg);
+    })();
+
+    // ----- IMPOSTAZIONI (solo admin) -----
     if(unlocked){
       const card=el('div',{className:'card',style:'grid-column:1 / -1'});
       card.appendChild(el('div',{className:'title'},'Impostazioni (admin)'));
+
       const row=el('div',{className:'row'});
-      const pin=el('input',{className:'input',placeholder:'Nuovo PIN (Enter)'}); pin.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&pin.value.trim().length>=4){state.adminPin=pin.value.trim(); saveLocal(state); unlocked=false; state._readonlyPublic=true; render(); flash('PIN aggiornato')}}); row.appendChild(pin);
+      // Cambia PIN
+      const pin=el('input',{className:'input',placeholder:'Nuovo PIN (Enter)'}); 
+      pin.addEventListener('keydown',(e)=>{if(e.key==='Enter'&&pin.value.trim().length>=4){state.adminPin=pin.value.trim(); saveLocal(state); unlocked=false; render(); flash('PIN aggiornato')}}); 
+      row.appendChild(pin);
+
+      // Gestione categorie
       row.appendChild(el('span',{className:'muted'},'Categorie:'));
-      const cn=el('input',{className:'input',placeholder:'Nome cat.'}); const ca=el('input',{className:'input',type:'number',step:'0.01',placeholder:'€ (vuoto = nessun importo)'}); const addC=el('button',{className:'btn',onClick:()=>{const n=cn.value.trim(); const v=ca.value.trim(); if(!n)return alert('Nome categoria obbligatorio'); state.categories.push({id:uid(),name:n,amount:(v===''?null:Number(v))}); cn.value=''; ca.value=''; saveLocal(state); render(); schedulePush()}},'Aggiungi categoria');
+      const cn=el('input',{className:'input',placeholder:'Nome cat.'}); 
+      const ca=el('input',{className:'input',type:'number',step:'0.01',placeholder:'€ (vuoto = nessun importo)'}); 
+      const addC=el('button',{className:'btn',onClick:()=>{const n=cn.value.trim(); const v=ca.value.trim(); if(!n)return alert('Nome categoria obbligatorio'); state.categories.push({id:uid(),name:n,amount:(v===''?null:Number(v))}); cn.value=''; ca.value=''; saveLocal(state); render(); schedulePush()}},'Aggiungi categoria');
       row.appendChild(cn); row.appendChild(ca); row.appendChild(addC);
-      const ul=el('ul',{style:'list-style:none;padding:0;margin:6px 0;width:100%'}); state.categories.forEach(c=>{const li=el('li',{className:'row'}); const n=el('input',{className:'input',value:c.name}); const a=el('input',{className:'input',type:'number',step:'0.01',value:(c.amount==null?'':c.amount)}); const del=el('button',{className:'btn ghost'},'✕'); n.addEventListener('blur',()=>{c.name=n.value; saveLocal(state); schedulePush()}); a.addEventListener('blur',()=>{const v=a.value.trim(); c.amount=(v===''?null:Number(v)); saveLocal(state); schedulePush()}); del.addEventListener('click',()=>{state.categories=state.categories.filter(x=>x.id!==c.id); saveLocal(state); render(); schedulePush()}); li.appendChild(n); li.appendChild(a); li.appendChild(del); ul.appendChild(li)});
+
+      const ul=el('ul',{style:'list-style:none;padding:0;margin:6px 0;width:100%'}); 
+      state.categories.forEach(c=>{
+        const li=el('li',{className:'row'});
+        const n=el('input',{className:'input',value:c.name}); 
+        const a=el('input',{className:'input',type:'number',step:'0.01',value:(c.amount==null?'':c.amount)});
+        const del=el('button',{className:'btn ghost'},'✕'); 
+        n.addEventListener('blur',()=>{c.name=n.value; saveLocal(state); schedulePush()}); 
+        a.addEventListener('blur',()=>{const v=a.value.trim(); c.amount=(v===''?null:Number(v)); saveLocal(state); schedulePush()}); 
+        del.addEventListener('click',()=>{state.categories=state.categories.filter(x=>x.id!==c.id); saveLocal(state); render(); schedulePush()}); 
+        li.appendChild(n); li.appendChild(a); li.appendChild(del); ul.appendChild(li);
+      });
       row.appendChild(ul);
+
+      // Supabase
       row.appendChild(el('span',{className:'muted'},'Sync Supabase (REST):'));
-      const url=el('input',{className:'input',placeholder:'Supabase URL (https://xxx.supabase.co)',value:state.sbUrl});
+      const url=el('input',{className:'input',placeholder:'Supabase URL',value:state.sbUrl});
       const anon=el('input',{className:'input',placeholder:'Anon key',value:state.sbAnon});
       const slug=el('input',{className:'input',placeholder:'Team slug',value:state.teamSlug});
-      url.addEventListener('input',()=>{state.sbUrl=url.value; saveLocal(state)}); anon.addEventListener('input',()=>{state.sbAnon=anon.value; saveLocal(state)}); slug.addEventListener('input',()=>{state.teamSlug=slug.value; saveLocal(state)});
+      url.addEventListener('input',()=>{state.sbUrl=url.value; saveLocal(state)}); 
+      anon.addEventListener('input',()=>{state.sbAnon=anon.value; saveLocal(state)}); 
+      slug.addEventListener('input',()=>{state.teamSlug=slug.value; saveLocal(state)});
       const hint=el('div',{className:'muted'}, supa.active?'Sync attivo':'Inserisci URL/Key/Slug per attivare');
       row.appendChild(url); row.appendChild(anon); row.appendChild(slug); row.appendChild(hint);
-      card.appendChild(row); grid.appendChild(card);
+
+      card.appendChild(row); 
+      card.appendChild(el('div',{className:'foot'},'Consiglio: dopo il primo avvio, usa "Aggiungi alla schermata Home" su iOS/Android. Funziona offline grazie a IndexedDB.'));
+      grid.appendChild(card);
     }
   }
 
   function exportCSV(){
-    const header=['Data','Giocatore','Motivo','Importo','Categoria','Paste?'].join(',');
-    const lines=state.fines.map(f=>{const p=state.players.find(x=>x.id===f.playerId); const name=p?p.name:'Sconosciuto'; const cat=f.categoryId?(state.categories.find(c=>c.id===f.categoryId)?.name||''):(f.isPaste?'Paste':''); return [f.date,name,(f.reason||'').replaceAll(',',';'),String(f.amount).replace('.',','),cat,f.isPaste?'Sì':'No'].join(',')});
-    const csv=[header,...lines].join('\n'); const blob=new Blob([String.fromCharCode(65279),csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`multe_${state.seasonName.replaceAll(' ','_')}.csv`; a.click(); URL.revokeObjectURL(url);
+    const header=['Data','Giocatore','Motivo','Importo','Categoria','Paste?','Pagata?','Pagata il'].join(',');
+    const lines=state.fines.map(f=>{
+      const p=state.players.find(x=>x.id===f.playerId);
+      const name=p?p.name:'Sconosciuto';
+      const cat=f.categoryId?(state.categories.find(c=>c.id===f.categoryId)?.name||''):(f.isPaste?'Paste':'');
+      return [f.date,name,(f.reason||'').replaceAll(',',';'),String(f.amount).replace('.',','),cat,f.isPaste?'Sì':'No',f.paid?'Sì':'No',f.paid_at||''].join(',');
+    });
+    const csv=[header,...lines].join('\n'); 
+    const blob=new Blob([String.fromCharCode(65279),csv],{type:'text/csv;charset=utf-8;'}); 
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`multe_${state.seasonName.replaceAll(' ','_')}.csv`; a.click(); URL.revokeObjectURL(url);
   }
   function exportJSON(){const payload={players:state.players,fines:state.fines,seasonName:state.seasonName,categories:state.categories}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='sicilybvs-backup.json'; a.click(); URL.revokeObjectURL(url);}
 
-  // ---- Bootstrap: carica da IDB/local, poi modalità pubblica + cloud ----
+  // ---------- Bootstrap ----------
   (async function boot(){
     state = (await loadLocal()) || defaultState();
-
-    // Se non ci sono parametri locali, usa quelli pubblici e resta in sola lettura
-    if ((!state.sbUrl || !state.sbAnon || !state.teamSlug) && DEFAULT_SUPA_URL && DEFAULT_SUPA_ANON && DEFAULT_TEAM_SLUG){
-      state.sbUrl    = DEFAULT_SUPA_URL;
-      state.sbAnon   = DEFAULT_SUPA_ANON;
-      state.teamSlug = DEFAULT_TEAM_SLUG;
-      state._readonlyPublic = true; // finché non inserisci il PIN
-    }
-
-    saveLocal(state); // persisti subito
+    // salva subito in IDB
+    saveLocal(state);
+    // render locale
     render();
-
+    // se cloud attivo → pull e applica se più nuovo
     if(supa.active){
       const res=await supa.pull();
       if(res && res.ok && res.ts && res.ts > (state.cloudTs||0)) applyCloud(res.ts,res.payload,true);
