@@ -86,6 +86,29 @@ body {
   .container { padding: 0 8px; }
   .table th, .table td { padding: 6px 5px; }
 }
+/* === Migliorie tabelle su mobile === */
+
+/* Non spezzare le intestazioni in verticale */
+.table thead th { white-space: nowrap; }
+
+/* I numeri non vanno a capo, allineati bene */
+.right, .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Evita che parole lunghe si rompano "a lettera" */
+.table th, .table td { word-break: normal; }
+
+/* Su mobile: font un filo più piccolo + padding ridotto */
+@media (max-width: 480px) {
+  .table { font-size: .88rem; }
+  .table th, .table td { padding: 6px 6px; }
+}
+
+/* Quando lo schermo è stretto, forziamo una larghezza minima
+   in modo da attivare lo scroll orizzontale dentro .table-wrap */
+@media (max-width: 480px) {
+  .table { min-width: 640px; }
+  .table-wrap { overflow-x: auto; }
+}
 </style>
 </head><body>
 <div class="wrap"><div class="container">
