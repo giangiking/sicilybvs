@@ -1,6 +1,42 @@
 <!doctype html><html lang="it"><head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no">
+<meta id="vp" name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<script>
+(function(){
+  function fitViewport(){
+    var vp = document.querySelector('meta[name="viewport"]');
+    if(!vp) return;
+    // larghezza schermo in CSS px
+    var dw = window.innerWidth;
+    // larghezza effettiva del layout (quanto “sporge” il contenuto)
+    var layoutW = Math.max(
+      document.documentElement.scrollWidth,
+      document.body ? document.body.scrollWidth : 0,
+      document.documentElement.clientWidth
+    );
+    // se su desktop o layout già dentro lo schermo, lasciamo scala 1
+    if (dw >= 900 || layoutW <= dw){
+      vp.setAttribute('content','width=device-width, initial-scale=1, user-scalable=no');
+      return;
+    }
+    // calcola scala per far entrare tutto
+    var scale = dw / layoutW;
+    // metti un limite di sicurezza (non diventare troppo minuscolo)
+    scale = Math.max(0.5, Math.min(1, scale));
+    // blocca la scala: niente zoom manuale necessario
+    vp.setAttribute('content',
+      'width=device-width, initial-scale='+scale+
+      ', minimum-scale='+scale+
+      ', maximum-scale='+scale+
+      ', user-scalable=no'
+    );
+  }
+  // esegui quando la pagina è pronta e su cambi di orientamento/ridimensionamento
+  window.addEventListener('load', fitViewport);
+  window.addEventListener('orientationchange', function(){ setTimeout(fitViewport, 250); });
+  window.addEventListener('resize', function(){ setTimeout(fitViewport, 150); });
+})();
+</script>
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
