@@ -162,6 +162,59 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
   function totalsByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0)}); return t}
   function pasteByPlayer(){const t={}; state.players.forEach(p=>t[p.id]=0); state.fines.forEach(f=>{if(f.isPaste) t[f.playerId]=(t[f.playerId]||0)+1}); return t}
   function teamTotal(){return state.fines.reduce((s,f)=>s+Number(f.amount||0),0)}
+
+function totalsAllByPlayer(){ // € totali (pagate + non pagate)
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0) });
+  return t;
+}
+function unpaidTotalsByPlayer(){ // € da incassare (solo non pagate)
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(!f.paid) t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0) });
+  return t;
+}
+function pasteByPlayerAll(){ // Paste totali (storico)
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(f.isPaste) t[f.playerId]=(t[f.playerId]||0)+1 });
+  return t;
+}
+function teamTotals(){ // somme squadra
+  let all=0, unpaid=0, paid=0, pasteAll=0;
+  state.fines.forEach(f=>{
+    const a=Number(f.amount||0);
+    all+=a; if(f.paid) paid+=a; else unpaid+=a;
+    if(f.isPaste) pasteAll++;
+  });
+  return {all, unpaid, paid, pasteAll};
+}
+function finesCountByPlayerAll(){ // numero multe (storico)
+  const t={}
+
+function unpaidPasteByPlayer(){ // Paste NON pagate per giocatore
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(f.isPaste && !f.paid) t[f.playerId]=(t[f.playerId]||0)+1 });
+  return t;
+}
+function paidPasteByPlayer(){ // Paste PAGATE per giocatore
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(f.isPaste && f.paid) t[f.playerId]=(t[f.playerId]||0)+1 });
+  return t;
+}
+function paidTotalsByPlayer(){ // € pagati
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(f.paid) t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0) });
+  return t;
+}
+function paidTotalsByPlayer(){ // € pagati (storico)
+  const t={}; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ if(f.paid) t[f.playerId]=(t[f.playerId]||0)+Number(f.amount||0) });
+  return t;
+}
+; state.players.forEach(p=>t[p.id]=0);
+  state.fines.forEach(f=>{ t[f.playerId]=(t[f.playerId]||0)+1 });
+  return t;
+}
+
   function teamPaste(){return state.fines.reduce((s,f)=>s+(f.isPaste?1:0),0)}
 
   function el(tag,attrs={},children=[]){const e=document.createElement(tag); for(const k in attrs){ if(k==='className')e.className=attrs[k]; else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(),attrs[k]); else e.setAttribute(k,attrs[k]); } (Array.isArray(children)?children:[children]).forEach(c=>{ if(c==null)return; if(typeof c==='string') e.appendChild(document.createTextNode(c)); else e.appendChild(c); }); return e}
@@ -212,17 +265,18 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       else{
         const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale'),el('th',{},'')])));
         const tbody=el('tbody');
-        state.players.forEach(p=>{
+        const _pastesUnp = unpaidPasteByPlayer(); const _euUnp = unpaidTotalsByPlayer(); const _playersSorted = [...state.players].sort((a,b)=>((_pastesUnp[b.id]||0)-(_pastesUnp[a.id]||0)) || ((_euUnp[b.id]||0)-(_euUnp[a.id]||0)));
+        _playersSorted.forEach(p=>{
           const tr=el('tr',{}), nameTd=el('td',{}), nameInp=el('input',{className:'input',value:p.name});
           nameInp.addEventListener('blur',()=>{p.name=nameInp.value.trim(); saveLocal(state); render(); schedulePush()}); nameTd.appendChild(nameInp);
           const totTd=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); totTd.appendChild(wrap);
+          wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); wrap.appendChild(el('small',{className:'muted',style:'margin-top:2px'},`Multe: ${_counts[p.id]||0}`)); totTd.appendChild(wrap);
           const delTd=el('td',{className:'right'}); delTd.appendChild(el('button',{className:'btn ghost',onClick:()=>{if(!confirm('Eliminare il giocatore?'))return; state.players=state.players.filter(x=>x.id!==p.id); saveLocal(state); render(); schedulePush()}},'✕'));
           tr.appendChild(nameTd); tr.appendChild(totTd); tr.appendChild(delTd); tbody.appendChild(tr);
         });
-        const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
+        })();})();const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
         const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
+        w.appendChild(document.createTextNode(fmt(teamTotals().unpaid))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamTotals().pasteAll}`)); tt.appendChild(w);
         tr.appendChild(tt); tr.appendChild(el('td',{},'')); tbody.appendChild(tr);
         table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
       }
@@ -234,13 +288,13 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       else{
         const table=el('table',{className:'table'}); table.appendChild(el('thead',{},el('tr',{},[el('th',{},'Nome'),el('th',{className:'right'},'Totale')])));
         const tbody=el('tbody');
-        state.players.forEach(p=>{const tr=el('tr',{}); tr.appendChild(el('td',{},p.name));
+        (function(){ const _pastesPaid = paidPasteByPlayer(); const _euPaid = paidTotalsByPlayer(); const _sorted=[...state.players].sort((a,b)=>((_pastesPaid[b.id]||0)-(_pastesPaid[a.id]||0)) || ((_euPaid[b.id]||0)-(_euPaid[a.id]||0))); _sorted.forEach(p=>{)const tr=el('tr',{}); tr.appendChild(el('td',{},p.name));
           const td=el('td',{className:'right'}), wrap=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
           wrap.appendChild(el('span',{className:'chip'},fmt(totals[p.id]||0))); wrap.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${pastes[p.id]||0}`)); td.appendChild(wrap);
           tr.appendChild(td); tbody.appendChild(tr)});
         const tr=el('tr',{}); tr.appendChild(el('td',{},el('b',{},'Totale squadra')));
         const tt=el('td',{className:'right',style:'font-weight:700'}), w=el('div',{style:'display:flex;flex-direction:column;align-items:flex-end'});
-        w.appendChild(document.createTextNode(fmt(teamTotal()))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamPaste()}`)); tt.appendChild(w);
+        w.appendChild(document.createTextNode(fmt(teamTotals().unpaid))); w.appendChild(el('small',{className:'muted',style:'margin-top:4px'},`Paste: ${teamTotals().pasteAll}`)); tt.appendChild(w);
         tr.appendChild(tt); tbody.appendChild(tr); table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
       }
       grid.appendChild(card);
@@ -266,7 +320,10 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         const isPaste=!!(cat&&(cat.name==='Paste'||cat.amount==null));
         const val=isPaste?0:Number(amtInp.value);
         if(!isPaste&&(isNaN(val)||val<=0)) return alert('Importo non valido');
-        state.fines.unshift({id:uid(),playerId:pid,amount:val,reason:(reasonInp.value||'').trim(),date:dateInp.value||todayISO(),categoryId:cat?cat.id:null,isPaste});
+        state.fines.unshift({id:uid(),playerId:pid,amount:val,reason:(reasonInp.value||'').trim(),date:dateInp.value||todayISO(),categoryId:cat?cat.id:null,isPaste
+  paid: false,
+  paid_at: null
+});
         saveLocal(state); render(); schedulePush();
         reasonInp.value=''; amtInp.value=''; dateInp.value=todayISO(); playerSel.value=''; catSel.value=''; syncAmtDisabled();
       });
@@ -287,14 +344,112 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         const tdPl=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'Sconosciuto')); state.players.forEach(p=>sel.appendChild(el('option',{value:p.id,selected:p.id===f.playerId},p.name))); sel.value = f.playerId || ''; sel.addEventListener('change',()=>{f.playerId=sel.value; saveLocal(state); schedulePush()}); tdPl.appendChild(sel)} else {const pl=state.players.find(x=>x.id===f.playerId); tdPl.textContent=pl?pl.name:'Sconosciuto'}
         const tdRe=el('td',{}); if(unlocked){const ri=el('input',{className:'input',value:f.reason||''}); ri.addEventListener('input',()=>{f.reason=ri.value; saveLocal(state)}); ri.addEventListener('blur',()=>{schedulePush()}); tdRe.appendChild(ri)} else tdRe.textContent=f.reason||'';
         const tdCa=el('td',{}); if(unlocked){const sel=el('select',{className:'input'}); sel.appendChild(el('option',{value:''},'(nessuna)')); state.categories.forEach(c=>sel.appendChild(el('option',{value:c.id,selected:(f.categoryId||'')===c.id},c.name))); sel.value = f.categoryId || (f.isPaste ? (state.categories.find(c=>c.name==='Paste')?.id || '') : ''); sel.addEventListener('change',()=>{f.categoryId=sel.value||null; const c=state.categories.find(x=>x.id===f.categoryId); f.isPaste=!!(c&&(c.name==='Paste'||c.amount==null)); if(f.isPaste)f.amount=0; saveLocal(state); render(); schedulePush()}); tdCa.appendChild(sel)} else {const c=state.categories.find(x=>x.id===f.categoryId); tdCa.textContent=c?c.name:(f.isPaste?'Paste':'')}
-        const tdAm=el('td',{className:'right'}); if(unlocked){const ai=el('input',{className:'input',type:'number',step:'0.01',value:f.amount}); if(f.isPaste) ai.disabled=true; ai.addEventListener('input',()=>{f.amount=Number(ai.value||0)}); ai.addEventListener('blur',()=>{saveLocal(state); schedulePush()}); tdAm.appendChild(ai)} else tdAm.textContent=fmt(f.amount);
+        const tdAm = el('td',{className:'right'});
+if(unlocked){
+  const wrap = el('div',{style:'display:flex;gap:8px;align-items:center;justify-content:flex-end'});
+  const ai = el('input',{className:'input',type:'number',step:'0.01',value:f.amount});
+  if(f.isPaste) ai.disabled=true;
+  ai.addEventListener('input',()=>{ f.amount = Number(ai.value||0) });
+  ai.addEventListener('blur',()=>{ saveLocal(state); schedulePush() });
+
+  const chk = el('input',{type:'checkbox'});
+  chk.checked = !!f.paid;
+  chk.title = 'Segna come pagata';
+  chk.addEventListener('change',()=>{
+    f.paid = chk.checked;
+    f.paid_at = f.paid ? todayISO() : null;
+    saveLocal(state); render(); schedulePush();
+  });
+
+  const badge = f.paid ? el('span',{className:'chip'},'Pagata') : null;
+
+  wrap.appendChild(ai);
+  wrap.appendChild(el('label',{},[chk, document.createTextNode(' Pagata')]));
+  if(badge) wrap.appendChild(badge);
+  tdAm.appendChild(wrap);
+} else tdAm.textContent = (f.paid ? (fmt(f.amount)+' (pagata)') : fmt(f.amount));
         tr.appendChild(tdDate); tr.appendChild(tdPl); tr.appendChild(tdRe); tr.appendChild(tdCa); tr.appendChild(tdAm);
         if(unlocked){const tdDel=el('td',{className:'right'}); tdDel.appendChild(el('button',{className:'btn ghost',onClick:()=>{state.fines=state.fines.filter(x=>x.id!==f.id); saveLocal(state); render(); schedulePush()}},'Elimina')); tr.appendChild(tdDel)}
         tbody.appendChild(tr);
       });
       table.appendChild(tbody); card.appendChild(el('div',{className:'table-wrap'},table));
     }
-    grid.appendChild(card);
+    // --- Statistiche (visibile a tutti) ---
+    (function(){
+      const stats = el('div',{className:'card',style:'grid-column:1 / -1'});
+      stats.appendChild(el('div',{className:'title'},'Statistiche (storico)'));
+      const tAll = totalsAllByPlayer();
+      const tUnp = unpaidTotalsByPlayer();
+      const tPaid = paidTotalsByPlayer();
+      const pAll = pasteByPlayerAll();
+      const pUnp = unpaidPasteByPlayer();
+      const pPaid = paidPasteByPlayer();
+      const rows = state.players.map(p=>({
+        name: p.name,
+        id: p.id,
+        euro_tot: tAll[p.id]||0,
+        euro_unp: tUnp[p.id]||0,
+        euro_paid: tPaid[p.id]||0,
+        paste_all: pAll[p.id]||0,
+        paste_unp: pUnp[p.id]||0,
+        paste_paid: pPaid[p.id]||0,
+        count: state.fines.filter(f=>f.playerId===p.id).length
+      }));
+      const tbl = el('table',{className:'table'});
+      tbl.appendChild(el('thead',{},el('tr',{},[
+        el('th',{},'Giocatore'),
+        el('th',{className:'right'},'€ totali'),
+        el('th',{className:'right'},'€ da pagare'),
+        el('th',{className:'right'},'€ pagati'),
+        el('th',{className:'right'},'Paste totali'),
+        el('th',{className:'right'},'Paste da pagare'),
+        el('th',{className:'right'},'Paste pagate'),
+        el('th',{className:'right'},'# multe')
+      ])));
+      const tb = el('tbody');
+      rows.forEach(r=>{
+        const tr = el('tr',{});
+        tr.appendChild(el('td',{},r.name));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_tot)));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_unp)));
+        tr.appendChild(el('td',{className:'right'},fmt(r.euro_paid)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_all)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_unp)));
+        tr.appendChild(el('td',{className:'right'},String(r.paste_paid)));
+        tr.appendChild(el('td',{className:'right'},String(r.count)));
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb);
+      stats.appendChild(tbl);
+      grid.appendChild(stats);
+    })();
+
+// --- Legenda categorie (visibile a tutti) ---
+    (function(){
+      const leg = el('div',{className:'card'});
+      leg.appendChild(el('div',{className:'title'},'Legenda categorie'));
+      if(state.categories.length===0){
+        leg.appendChild(el('div',{className:'muted'},'Nessuna categoria definita.'));
+      } else {
+        const tbl = el('table',{className:'table'});
+        tbl.appendChild(el('thead',{},el('tr',{},[
+          el('th',{},'Categoria'),
+          el('th',{className:'right'},'Importo')
+        ])));
+        const tb = el('tbody');
+        state.categories.forEach(c=>{
+          const tr = el('tr',{});
+          tr.appendChild(el('td',{},c.name));
+          tr.appendChild(el('td',{className:'right'}, c.amount==null ? '—' : fmt(Number(c.amount)) ));
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb);
+        leg.appendChild(tbl);
+      }
+      grid.appendChild(leg);
+    })();
+
+grid.appendChild(card);
 
     if(unlocked){
       const card=el('div',{className:'card',style:'grid-column:1 / -1'});
@@ -318,7 +473,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
   }
 
   function exportCSV(){
-    const header=['Data','Giocatore','Motivo','Importo','Categoria','Paste?'].join(',');
+    const header=['Data','Giocatore','Motivo','Importo','Categoria','Paste?','Pagata?','Pagata il'].join(',');
     const lines=state.fines.map(f=>{const p=state.players.find(x=>x.id===f.playerId); const name=p?p.name:'Sconosciuto'; const cat=f.categoryId?(state.categories.find(c=>c.id===f.categoryId)?.name||''):(f.isPaste?'Paste':''); return [f.date,name,(f.reason||'').replaceAll(',',';'),String(f.amount).replace('.',','),cat,f.isPaste?'Sì':'No'].join(',')});
     const csv=[header,...lines].join('\n'); const blob=new Blob([String.fromCharCode(65279),csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`multe_${state.seasonName.replaceAll(' ','_')}.csv`; a.click(); URL.revokeObjectURL(url);
   }
