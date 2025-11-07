@@ -468,6 +468,37 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       grid.appendChild(stats);
     })();
 
+    // ----- LEGENDA (visibile a tutti) -----
+    (function(){
+      const legend = el('div',{className:'card',style:'grid-column:1 / -1'});
+      legend.appendChild(el('div',{className:'title'},'Legenda multe'));
+
+      // Ordina categorie: prima "Paste", poi per importo decrescente
+      const cats = state.categories.slice().sort((a,b)=>{
+        if (a.name === 'Paste') return -1;
+        if (b.name === 'Paste') return 1;
+        const va = a.amount ?? 0, vb = b.amount ?? 0;
+        return vb - va;
+      });
+
+      const tbl = el('table',{className:'table'});
+      tbl.appendChild(el('thead',{}, el('tr',{},[
+        el('th',{},'Categoria'),
+        el('th',{className:'right'},'Importo (€)')
+      ])));
+
+      const tb = el('tbody');
+      cats.forEach(c=>{
+        const tr = el('tr',{});
+        tr.appendChild(el('td',{}, c.name));
+        tr.appendChild(el('td',{className:'right'}, c.amount==null?'—':fmt(c.amount)));
+        tb.appendChild(tr);
+      });
+      tbl.appendChild(tb);
+      legend.appendChild(tbl);
+      grid.appendChild(legend);
+    })();
+
     // ----- IMPOSTAZIONI (solo admin) -----
     if(unlocked){
       const card=el('div',{className:'card',style:'grid-column:1 / -1'});
