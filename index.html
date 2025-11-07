@@ -1,56 +1,6 @@
 <!doctype html><html lang="it"><head>
 <meta charset="utf-8"/>
-<meta id="vp" name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<script>
-(function(){
-  // Calcola la larghezza "reale" del contenuto (meglio usare il tuo contenitore)
-  function getLayoutWidth(){
-    var c = document.querySelector('.container') || document.body || document.documentElement;
-    return Math.max(
-      c.scrollWidth,
-      c.clientWidth,
-      document.documentElement.scrollWidth,
-      document.documentElement.clientWidth
-    );
-  }
-
-  function setViewportScale(scale){
-    var vp = document.getElementById('vp');
-    if(!vp) return;
-    // blocchiamo la scala per evitare zoom involontari
-    vp.setAttribute('content',
-      'width=device-width,'+
-      ' initial-scale='+scale+','+
-      ' minimum-scale='+scale+','+
-      ' maximum-scale='+scale+','+
-      ' user-scalable=no'
-    );
-  }
-
-  function fitOnce(){
-    var dw = window.innerWidth;
-    var lw = getLayoutWidth();
-    // Se il contenuto entra già, scala 1
-    var s = (lw > dw) ? (dw / lw) : 1;
-    // non scendere troppo (per leggibilità)
-    s = Math.max(0.75, Math.min(1, s));
-    setViewportScale(s);
-  }
-
-  // Esegui UNA volta al load
-  window.addEventListener('load', function(){
-    // attendi il layout finale
-    setTimeout(fitOnce, 120);
-  });
-
-  // Ricalcola SOLO al cambio di orientamento (non su resize normale)
-  window.addEventListener('orientationchange', function(){
-    setTimeout(fitOnce, 350);
-  });
-
-  // Non registriamo alcun 'resize' → niente “zoom che respira” mentre scorri
-})();
-</script>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
