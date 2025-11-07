@@ -4,26 +4,24 @@
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
-/* --- Adattamento mobile e prevenzione scroll orizzontale --- */
+/* Mobile-safe */
 html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
 * { box-sizing: border-box; }
 
 /* Tema */
 :root { --gold:#D4A000; --blue:#1C75BC; --ink:#0b0b0f; }
 
-/* Base */
-html, body { height: 100%; }
+/* Tipografia fluida (si riduce da sola su schermi piccoli) */
+html { font-size: clamp(14px, 2.2vw, 16px); }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
   color: var(--ink);
   background: linear-gradient(180deg, #e9f2ff, #fef9e6);
-  /* Safe area per iPhone con notch */
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
 }
 
-/* Contenitore fluido con max-width */
+/* Contenitore */
 .wrap { min-height: 100%; display: flex; justify-content: center; padding: 16px; }
 .container { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 10px; }
 
@@ -33,8 +31,23 @@ body {
 .logo { width: 52px; height: 52px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
 
 /* Form & bottoni */
-.input { padding: 10px 12px; border: 1px solid #d4d4dd; border-radius: 10px; background: #fff; min-height: 38px; }
-.btn { padding: 9px 12px; border-radius: 10px; border: 0; background: var(--blue); color: #fff; cursor: pointer; }
+.input {
+  padding: 10px 12px;
+  border: 1px solid #d4d4dd;
+  border-radius: 10px;
+  background: #fff;
+  min-height: 38px;
+  font-size: clamp(.9rem, 2.6vw, 1rem);
+}
+.btn {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+  font-size: clamp(.9rem, 2.6vw, 1rem);
+}
 .btn.ghost { background: transparent; color: #dc2626; border: 1px solid #f0caca; }
 
 /* Layout griglia */
@@ -43,105 +56,34 @@ body {
 
 /* Card */
 .card { background: #fff; border-top: 4px solid var(--gold); border-radius: 14px; box-shadow: 0 6px 16px rgba(0,0,0,.06); padding: 12px; }
-.title { font-size: 1.05rem; font-weight: 700; margin: 0 0 8px; }
+.title { font-size: clamp(1.05rem, 3.4vw, 1.35rem); font-weight: 700; margin: 0 0 8px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* Tabelle */
-.table-wrap { overflow: auto; -webkit-overflow-scrolling: touch; }
-.table { width: 100%; border-collapse: collapse; font-size: .95rem; table-layout: auto; }
-.table th, .table td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: middle; word-break: break-word; }
-
-/* Header tabella “appiccicoso” quando la tabella scorre */
-.table-wrap .table thead th {
-  position: sticky; top: 0;
-  background: #fff; z-index: 1;
-  box-shadow: 0 1px 0 #eee;
+/* Tabelle — senza scroll orizzontale né tagli */
+.table { width: 100%; border-collapse: collapse; font-size: clamp(.88rem, 2.6vw, .95rem); table-layout: auto; }
+.table th, .table td {
+  padding: clamp(6px, 1.2vw, 10px);
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  vertical-align: middle;
+  word-break: keep-all;  /* non spezzare a lettere */
+  hyphens: auto;         /* se serve, va a capo in modo naturale */
 }
+.table thead th { white-space: normal; } /* consenti il ritorno a capo nei titoli */
 
-/* Righe zebra per leggibilità */
-.table tbody tr:nth-child(odd) { background: #fafafa; }
+/* Numeri compatti in una riga */
+.right, .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Utility */
-.right { text-align: right; }
 .muted { opacity: .75; }
 .badge { background: var(--blue); color: #fff; border-radius: 999px; padding: 2px 8px; font-size: .75rem; margin-left: 6px; }
 .chip { background: #fff8e1; border: 1px solid #ffe2a3; border-radius: 999px; padding: 4px 8px; font-weight: 600; }
 .foot { opacity: .7; font-size: .9rem; margin-top: 8px; }
 
-/* --- Ottimizzazioni su schermi stretti --- */
-@media (max-width: 480px) {
-  .logo { width: 44px; height: 44px; }
-  .title { font-size: 1rem; }
-  .input, .btn { min-height: 36px; }
-  .table { font-size: .92rem; }
-  .table th, .table td { padding: 7px 6px; }
-  .row > .input { flex: 1 1 140px; }          /* gli input vanno a capo in modo pulito */
-  .row > .btn { flex: 0 0 auto; }
-  /* per campi molto lunghi (motivo), lascia andare a capo */
-  .table td:nth-child(3) { white-space: normal; }
-}
-
-/* Piccolo margine di respiro sugli schermi piccolissimi */
-@media (max-width: 360px) {
-  .container { padding: 0 8px; }
-  .table th, .table td { padding: 6px 5px; }
-}
-/* === Migliorie tabelle su mobile === */
-
-/* Non spezzare le intestazioni in verticale */
-.table thead th { white-space: nowrap; }
-
-/* I numeri non vanno a capo, allineati bene */
-.right, .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-/* Evita che parole lunghe si rompano "a lettera" */
-.table th, .table td { word-break: normal; }
-
-/* Su mobile: font un filo più piccolo + padding ridotto */
-@media (max-width: 480px) {
-  .table { font-size: .88rem; }
-  .table th, .table td { padding: 6px 6px; }
-}
-
-/* Quando lo schermo è stretto, forziamo una larghezza minima
-   in modo da attivare lo scroll orizzontale dentro .table-wrap */
-@media (max-width: 480px) {
-  .table { min-width: 640px; }
-  .table-wrap { overflow-x: auto; }
-}
-/* === FIX MOBILE: font/padding più compatti, tabelle scorrevoli === */
-
-/* intestazioni su una riga */
-.table thead th { white-space: nowrap; }
-
-/* numeri sempre su una riga e allineati meglio */
-.right, .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-/* niente parole spezzate lettera per lettera */
-.table th, .table td { word-break: normal; }
-
-/* tabelle scorrevoli in orizzontale dentro la card */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-/* ▼▼ SOSTITUISCI/AGGIUNGI questa classe se stai usando .table--wide ▼▼ */
-.table--wide { min-width: 600px; }               /* prima era 680: la rendiamo più contenuta */
-@media (max-width: 480px) { .table--wide { min-width: 560px; } }
-
-/* Mobile: riduci un po' tutto */
-@media (max-width: 480px) {
-  html, body { font-size: 15px; }               /* base più piccola */
-  .title { font-size: 1rem; }
-  .logo { width: 44px; height: 44px; }
-  .input, .btn { min-height: 34px; font-size: .95rem; padding: 8px 10px; }
-  .table { font-size: .88rem; }
-  .table th, .table td { padding: 6px 6px; }
-}
-
-/* Telefono molto stretto (es. iPhone SE) */
+/* Piccoli schermi: stringi ancora un filo */
 @media (max-width: 375px) {
-  html, body { font-size: 14px; }
-  .table { font-size: .82rem; }
-  .table th, .table td { padding: 5px 5px; }
+  .logo { width: 44px; height: 44px; }
+  .table { font-size: .85rem; }
 }
 </style>
 </head><body>
