@@ -1,6 +1,6 @@
 <!doctype html><html lang="it"><head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sicily BVS – Multe</title>
 <link rel="icon" href="/icon-192.png" sizes="192x192">
 <style>
@@ -108,6 +108,40 @@ body {
 @media (max-width: 480px) {
   .table { min-width: 640px; }
   .table-wrap { overflow-x: auto; }
+}
+/* === FIX MOBILE: font/padding più compatti, tabelle scorrevoli === */
+
+/* intestazioni su una riga */
+.table thead th { white-space: nowrap; }
+
+/* numeri sempre su una riga e allineati meglio */
+.right, .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* niente parole spezzate lettera per lettera */
+.table th, .table td { word-break: normal; }
+
+/* tabelle scorrevoli in orizzontale dentro la card */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ▼▼ SOSTITUISCI/AGGIUNGI questa classe se stai usando .table--wide ▼▼ */
+.table--wide { min-width: 600px; }               /* prima era 680: la rendiamo più contenuta */
+@media (max-width: 480px) { .table--wide { min-width: 560px; } }
+
+/* Mobile: riduci un po' tutto */
+@media (max-width: 480px) {
+  html, body { font-size: 15px; }               /* base più piccola */
+  .title { font-size: 1rem; }
+  .logo { width: 44px; height: 44px; }
+  .input, .btn { min-height: 34px; font-size: .95rem; padding: 8px 10px; }
+  .table { font-size: .88rem; }
+  .table th, .table td { padding: 6px 6px; }
+}
+
+/* Telefono molto stretto (es. iPhone SE) */
+@media (max-width: 375px) {
+  html, body { font-size: 14px; }
+  .table { font-size: .82rem; }
+  .table th, .table td { padding: 5px 5px; }
 }
 </style>
 </head><body>
