@@ -81,8 +81,8 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         {id:uid(),name:"Paste",amount:null}
       ],
       // Supabase preconfigurato
-      sbUrl:"https://pbzzfhfpnackeltfcrkw.supabase.co",
-      sbAnon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBienpmaGZwbmFja2VsZnRjcmt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTA2NjcsImV4cCI6MjA3Nzk4NjY2N30.vPh4xJL5RfzyLuUhbR1SCXVRTAIjKVo0WuoSSlmYJ24",
+      sbUrl:"https://nsmubyeiicceravtvpvm.supabase.co",
+      sbAnon:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbXVieWVpaWNjZXJhdnR2cHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTUxNjAsImV4cCI6MjA3Nzk5MTE2MH0.PCgKIZYRrpY-uxlCHt48xJ_DWuZvbHMh5X_kPFd6rC8",
       teamSlug:"sicily-bvs",
       cloudTs:0
     };
@@ -536,6 +536,19 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
   // ---------- Bootstrap ----------
   (async function boot(){
     state = (await loadLocal()) || defaultState();
+// --- Enforce parametri cloud su questo dispositivo (se diversi) ---
+const CODE_SB = {
+  url: "https://nsmubyeiicceravtvpvm.supabase.co",
+  anon: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zbXVieWVpaWNjZXJhdnR2cHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MTUxNjAsImV4cCI6MjA3Nzk5MTE2MH0.PCgKIZYRrpY-uxlCHt48xJ_DWuZvbHMh5X_kPFd6rC8",
+  slug: "sicily-bvs"
+};
+if (state.sbUrl !== CODE_SB.url || state.sbAnon !== CODE_SB.anon || state.teamSlug !== CODE_SB.slug) {
+  state.sbUrl = CODE_SB.url;
+  state.sbAnon = CODE_SB.anon;
+  state.teamSlug = CODE_SB.slug;
+  saveLocal(state);
+  flash("Parametri cloud aggiornati su questo dispositivo");
+}
     // salva subito in IDB
     saveLocal(state);
     // render locale
