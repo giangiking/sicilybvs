@@ -411,6 +411,12 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
       const pUnp = unpaidPasteByPlayer();
       const pPaid= paidPasteByPlayer();
       const rows = state.players.map(p=>({
+  // Ordina lo storico: prima Paste pagate, poi € pagati (discendenti)
+  const rowsSorted = [...rows].sort((a,b) =>
+    (b.paste_paid - a.paste_paid) ||
+    (b.euro_paid  - a.euro_paid)  ||
+    a.name.localeCompare(b.name)
+  );
         name: p.name, id: p.id,
         euro_tot: tAll[p.id]||0,
         euro_unp: tUnp[p.id]||0,
@@ -432,7 +438,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sa
         el('th',{className:'right'},'# multe')
       ])));
       const tb=el('tbody');
-      rows.forEach(r=>{
+        rowsSorted.forEach(r=>{
         const tr=el('tr',{});
         tr.appendChild(el('td',{},r.name));
         tr.appendChild(el('td',{className:'right'},fmt(r.euro_tot)));
